@@ -4,6 +4,8 @@ export interface AlertRule {
   spot: string
   waveMin: number
   waveMax: number
+  energyMin: number
+  energyMax: number
   periodMin: number
   periodMax: number
   windMin?: number

@@ -1,16 +1,43 @@
 import 'dotenv/config'
-import { Bot } from 'grammy'
-import { deleteAlert, insertAlert, listAlerts, listAllAlerts, touchAlertNotified } from './storage.js'
+import { Bot, InlineKeyboard } from 'grammy'
+import {
+  deleteAlert,
+  insertAlert,
+  listAlerts,
+  listAllAlerts,
+  touchAlertNotified,
+} from './storage.js'
 import type { AlertRule, SurfForecast } from './types.js'
 import { degreesToCardinal, nextId, primaryPeriod, totalWaveHeight } from './utils.js'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.app'
 const CHECK_INTERVAL_MIN = Number(process.env.CHECK_INTERVAL_MIN ?? 30)
+const DEFAULT_SPOT = 'sopela'
 
-if (!BOT_TOKEN) {
-  throw new Error('Missing TELEGRAM_BOT_TOKEN')
+type Step =
+  | 'waveMin'
+  | 'waveMax'
+  | 'energyMin'
+  | 'energyMax'
+  | 'periodMin'
+  | 'periodMax'
+  | 'wind'
+
+interface DraftAlert {
+  step: Step
+  spot: string
+  waveMin?: number
+  waveMax?: number
+  energyMin?: number
+  energyMax?: number
+  periodMin?: number
+  periodMax?: number
 }
+
+const drafts = new Map<number, DraftAlert>()
+
+if (!BOT_TOKEN) throw new Error('Missing TELEGRAM_BOT_TOKEN')
 
 const bot = new Bot(BOT_TOKEN)
 
@@ -18,59 +45,10 @@ function normalizeAngle(deg: number): number {
   return ((deg % 360) + 360) % 360
 }
 
-function parseRange(value: string): [number, number] | null {
-  const [a, b] = value.split('-').map(Number)
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return null
-  return [a, b]
-}
-
-function parseWindRange(value: string): [number, number] | null {
-  const range = parseRange(value)
-  if (!range) return null
-  return [normalizeAngle(range[0]), normalizeAngle(range[1])]
-}
-
-function parseSetAlert(text: string, chatId: number): AlertRule | null {
-  const chunks = text.replace('/setalert', '').trim().split(/\s+/).filter(Boolean)
-  const kv = new Map<string, string>()
-
-  for (const chunk of chunks) {
-    const [k, ...rest] = chunk.split('=')
-    if (!k || rest.length === 0) continue
-    kv.set(k.toLowerCase(), rest.join('='))
-  }
-
-  const spot = kv.get('spot')
-  const wave = kv.get('wave')
-  const period = kv.get('period')
-  const wind = kv.get('wind')
-  const cooldown = Number(kv.get('cooldown') ?? 180)
-
-  if (!spot || !wave || !period) return null
-
-  const waveRange = parseRange(wave)
-  const periodRange = parseRange(period)
-  const windRange = wind ? parseWindRange(wind) : null
-  if (!waveRange || !periodRange || !Number.isFinite(cooldown)) return null
-  if (wind && !windRange) return null
-
-  return {
-    id: nextId(),
-    chatId,
-    spot,
-    waveMin: waveRange[0],
-    waveMax: waveRange[1],
-    periodMin: periodRange[0],
-    periodMax: periodRange[1],
-    ...(windRange
-      ? {
-          windMin: windRange[0],
-          windMax: windRange[1],
-        }
-      : {}),
-    cooldownMin: cooldown,
-    createdAt: new Date().toISOString(),
-  }
+function isWindInRange(current: number, min?: number, max?: number): boolean {
+  if (min === undefined || max === undefined) return true
+  if (min <= max) return current >= min && current <= max
+  return current >= min || current <= max
 }
 
 async function fetchForecast(spot: string): Promise<SurfForecast | null> {
@@ -81,26 +59,18 @@ async function fetchForecast(spot: string): Promise<SurfForecast | null> {
   return data[0] ?? null
 }
 
-function isWindInRange(
-  current: number,
-  min?: number,
-  max?: number,
-): boolean {
-  if (min === undefined || max === undefined) return true
-  if (min <= max) return current >= min && current <= max
-  return current >= min || current <= max
-}
-
 function matches(alert: AlertRule, f: SurfForecast): boolean {
   const wave = totalWaveHeight(f)
   const period = primaryPeriod(f)
   const windAngle = normalizeAngle(f.wind.angle)
+  const energy = f.energy
 
   const inWave = wave >= alert.waveMin && wave <= alert.waveMax
+  const inEnergy = energy >= alert.energyMin && energy <= alert.energyMax
   const inPeriod = period >= alert.periodMin && period <= alert.periodMax
   const inWind = isWindInRange(windAngle, alert.windMin, alert.windMax)
 
-  return inWave && inPeriod && inWind
+  return inWave && inEnergy && inPeriod && inWind
 }
 
 function cooldownOk(alert: AlertRule): boolean {
@@ -126,33 +96,234 @@ async function runChecks(): Promise<void> {
 
       await bot.api.sendMessage(
         alert.chatId,
-        `🌊 ALERTA ${alert.spot}\nOla: ${wave}m\nPeriodo: ${period}s\nViento: ${wind}`,
+        `🌊 ALERTA ${alert.spot}\nOla: ${wave}m\nPeriodo: ${period}s\nEnergía: ${f.energy.toFixed(0)}\nViento: ${wind}`,
       )
 
       touchAlertNotified(alert.id, new Date().toISOString())
     } catch {
-      // noop, continue
+      // noop
     }
+  }
+}
+
+function parseNumber(text: string): number | null {
+  const value = Number(text.replace(',', '.'))
+  return Number.isFinite(value) ? value : null
+}
+
+function windKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('N ↑ (337-22°)', 'wind:N')
+    .text('NE ↗ (22-67°)', 'wind:NE')
+    .row()
+    .text('E → (67-112°)', 'wind:E')
+    .text('SE ↘ (112-157°)', 'wind:SE')
+    .row()
+    .text('S ↓ (157-202°)', 'wind:S')
+    .text('SW ↙ (202-247°)', 'wind:SW')
+    .row()
+    .text('W ← (247-292°)', 'wind:W')
+    .text('NW ↖ (292-337°)', 'wind:NW')
+    .row()
+    .text('ANY (sin filtro)', 'wind:ANY')
+}
+
+function windSector(dir: string): [number, number] | null {
+  switch (dir) {
+    case 'N':
+      return [337.5, 22.5]
+    case 'NE':
+      return [22.5, 67.5]
+    case 'E':
+      return [67.5, 112.5]
+    case 'SE':
+      return [112.5, 157.5]
+    case 'S':
+      return [157.5, 202.5]
+    case 'SW':
+      return [202.5, 247.5]
+    case 'W':
+      return [247.5, 292.5]
+    case 'NW':
+      return [292.5, 337.5]
+    default:
+      return null
+  }
+}
+
+function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
+  if (
+    d.waveMin === undefined ||
+    d.waveMax === undefined ||
+    d.energyMin === undefined ||
+    d.energyMax === undefined ||
+    d.periodMin === undefined ||
+    d.periodMax === undefined
+  ) {
+    return null
+  }
+
+  return {
+    id: nextId(),
+    chatId,
+    spot: d.spot,
+    waveMin: d.waveMin,
+    waveMax: d.waveMax,
+    energyMin: d.energyMin,
+    energyMax: d.energyMax,
+    periodMin: d.periodMin,
+    periodMax: d.periodMax,
+    cooldownMin: 180,
+    createdAt: new Date().toISOString(),
+  }
+}
+
+async function askNext(chatId: number): Promise<string> {
+  const d = drafts.get(chatId)
+  if (!d) return 'No active draft.'
+
+  switch (d.step) {
+    case 'waveMin':
+      return 'Altura mínima (m):'
+    case 'waveMax':
+      return 'Altura máxima (m):'
+    case 'energyMin':
+      return 'Energía mínima:'
+    case 'energyMax':
+      return 'Energía máxima:'
+    case 'periodMin':
+      return 'Periodo mínimo (s):'
+    case 'periodMax':
+      return 'Periodo máximo (s):'
+    case 'wind':
+      return 'Elige dirección de viento:'
   }
 }
 
 bot.command('start', async (ctx) => {
   await ctx.reply(
-    'Bot de alertas listo.\n\nUsa:\n/setalert spot=sopelana wave=0.8-1.6 period=8-14 wind=240-300 cooldown=180\n/listalerts\n/deletealert <id>',
+    'Bot listo.\n\nComandos:\n/setalert (modo guiado)\n/listalerts\n/deletealert <id>\n/cancel',
   )
 })
 
 bot.command('setalert', async (ctx) => {
-  const parsed = parseSetAlert(ctx.message?.text ?? '', ctx.chat.id)
-  if (!parsed) {
-    await ctx.reply(
-      'Formato:\n/setalert spot=sopelana wave=0.8-1.6 period=8-14 wind=240-300 cooldown=180',
-    )
+  drafts.set(ctx.chat.id, {
+    step: 'waveMin',
+    spot: DEFAULT_SPOT,
+  })
+
+  await ctx.reply(`Vamos a crear la alerta para spot: ${DEFAULT_SPOT}`)
+  await ctx.reply('Altura mínima (m):')
+})
+
+bot.command('cancel', async (ctx) => {
+  drafts.delete(ctx.chat.id)
+  await ctx.reply('❌ Creación de alerta cancelada.')
+})
+
+bot.on('callback_query:data', async (ctx) => {
+  const data = ctx.callbackQuery.data
+  if (!data.startsWith('wind:')) return
+
+  const chatId = ctx.chat?.id
+  if (!chatId) return
+
+  const d = drafts.get(chatId)
+  if (!d || d.step !== 'wind') {
+    await ctx.answerCallbackQuery({ text: 'No hay alerta en creación.' })
     return
   }
 
-  insertAlert(parsed)
-  await ctx.reply(`✅ Alerta creada: ${parsed.id}`)
+  const value = data.replace('wind:', '')
+  const alertBase = draftToAlert(chatId, d)
+  if (!alertBase) {
+    await ctx.answerCallbackQuery({ text: 'Faltan datos previos.' })
+    return
+  }
+
+  const finalAlert: AlertRule =
+    value === 'ANY'
+      ? alertBase
+      : (() => {
+          const range = windSector(value)
+          if (!range) return alertBase
+          return {
+            ...alertBase,
+            windMin: range[0],
+            windMax: range[1],
+          }
+        })()
+
+  insertAlert(finalAlert)
+  drafts.delete(chatId)
+
+  await ctx.answerCallbackQuery({ text: 'Alerta creada' })
+  await ctx.reply(`✅ Alerta creada: ${finalAlert.id}`)
+})
+
+bot.on('message:text', async (ctx) => {
+  const text = ctx.message.text.trim()
+  if (text.startsWith('/')) return
+
+  const chatId = ctx.chat?.id
+  if (!chatId) return
+
+  const d = drafts.get(chatId)
+  if (!d) return
+
+  const value = parseNumber(text)
+  if (value === null) {
+    await ctx.reply('Pon un número válido (ej: 1.2)')
+    return
+  }
+
+  switch (d.step) {
+    case 'waveMin':
+      d.waveMin = value
+      d.step = 'waveMax'
+      await ctx.reply(await askNext(chatId))
+      return
+    case 'waveMax':
+      if (d.waveMin !== undefined && value < d.waveMin) {
+        await ctx.reply('Debe ser >= altura mínima')
+        return
+      }
+      d.waveMax = value
+      d.step = 'energyMin'
+      await ctx.reply(await askNext(chatId))
+      return
+    case 'energyMin':
+      d.energyMin = value
+      d.step = 'energyMax'
+      await ctx.reply(await askNext(chatId))
+      return
+    case 'energyMax':
+      if (d.energyMin !== undefined && value < d.energyMin) {
+        await ctx.reply('Debe ser >= energía mínima')
+        return
+      }
+      d.energyMax = value
+      d.step = 'periodMin'
+      await ctx.reply(await askNext(chatId))
+      return
+    case 'periodMin':
+      d.periodMin = value
+      d.step = 'periodMax'
+      await ctx.reply(await askNext(chatId))
+      return
+    case 'periodMax':
+      if (d.periodMin !== undefined && value < d.periodMin) {
+        await ctx.reply('Debe ser >= periodo mínimo')
+        return
+      }
+      d.periodMax = value
+      d.step = 'wind'
+      await ctx.reply(await askNext(chatId), { reply_markup: windKeyboard() })
+      return
+    case 'wind':
+      await ctx.reply('Pulsa una opción de viento en los botones.')
+      return
+  }
 })
 
 bot.command('listalerts', async (ctx) => {
@@ -164,7 +335,7 @@ bot.command('listalerts', async (ctx) => {
 
   const lines = alerts.map(
     (a) =>
-      `• ${a.id} | ${a.spot} | ola ${a.waveMin}-${a.waveMax}m | periodo ${a.periodMin}-${a.periodMax}s | viento ${a.windMin !== undefined && a.windMax !== undefined ? `${a.windMin}-${a.windMax}°` : 'ANY'} | cooldown ${a.cooldownMin}m`,
+      `• ${a.id} | ${a.spot} | ola ${a.waveMin}-${a.waveMax}m | energía ${a.energyMin}-${a.energyMax} | periodo ${a.periodMin}-${a.periodMax}s | viento ${a.windMin !== undefined && a.windMax !== undefined ? `${a.windMin}-${a.windMax}°` : 'ANY'} | cooldown ${a.cooldownMin}m`,
   )
 
   await ctx.reply(lines.join('\n'))
