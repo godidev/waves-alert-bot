@@ -6,6 +6,7 @@ export interface WindRange {
 export interface AlertRule {
   id: string
   chatId: number
+  name: string
   spot: string
   waveMin: number
   waveMax: number

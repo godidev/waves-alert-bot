@@ -15,7 +15,7 @@ const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.
 const CHECK_INTERVAL_MIN = Number(process.env.CHECK_INTERVAL_MIN ?? 30)
 const DEFAULT_SPOT = 'sopela'
 
-type Step = 'wave' | 'energy' | 'period' | 'wind' | 'confirm'
+type Step = 'name' | 'wave' | 'energy' | 'period' | 'wind' | 'confirm'
 
 type RangeOption = { id: string; label: string; min: number; max: number }
 
@@ -47,6 +47,7 @@ const ENERGY_OPTIONS: RangeOption[] = [
 
 interface DraftAlert {
   step: Step
+  name?: string
   spot: string
   waveSelected: string[]
   periodSelected: string[]
@@ -161,7 +162,8 @@ function confirmKeyboard(): InlineKeyboard {
 
 function alertSummaryText(a: AlertRule): string {
   return [
-    `🧾 Resumen de alerta (${a.spot})`,
+    `🧾 Resumen de alerta: ${a.name}`,
+    `• Spot: ${a.spot}`,
     `• Olas: ${a.waveLabels?.join(', ') ?? `${a.waveMin}-${a.waveMax}m`}`,
     `• Energía: ${a.energyLabel ?? `${a.energyMin}-${a.energyMax}`}`,
     `• Periodo: ${a.periodLabels?.join(', ') ?? `${a.periodMin}-${a.periodMax}s`}`,
@@ -191,6 +193,7 @@ function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
   return {
     id: nextId(),
     chatId,
+    name: d.name?.trim() || `Alerta ${new Date().toLocaleDateString('es-ES')}`,
     spot: d.spot,
     waveMin: waveEnv.min,
     waveMax: waveEnv.max,
@@ -266,7 +269,7 @@ async function runChecks(): Promise<void> {
 
       await bot.api.sendMessage(
         alert.chatId,
-        `🌊 ALERTA ${alert.spot}\nCoincidencias próximas horas: ${matchesFound.length}\nPrimera: ${dateText}\nOla: ${totalWaveHeight(first).toFixed(2)}m\nPeriodo: ${primaryPeriod(first).toFixed(1)}s\nEnergía: ${first.energy.toFixed(0)}\nViento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)`,
+        `🌊 ALERTA: ${alert.name}\nSpot: ${alert.spot}\nCoincidencias próximas horas: ${matchesFound.length}\nPrimera: ${dateText}\nOla: ${totalWaveHeight(first).toFixed(2)}m\nPeriodo: ${primaryPeriod(first).toFixed(1)}s\nEnergía: ${first.energy.toFixed(0)}\nViento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)`,
       )
       touchAlertNotified(alert.id, new Date().toISOString())
     } catch {
@@ -283,22 +286,41 @@ bot.command('start', async (ctx) => {
 
 bot.command('setalert', async (ctx) => {
   drafts.set(ctx.chat.id, {
-    step: 'wave',
+    step: 'name',
     spot: DEFAULT_SPOT,
     waveSelected: [],
     periodSelected: [],
     windSelected: [],
   })
 
-  await ctx.reply(`Spot fijo: ${DEFAULT_SPOT}`)
-  await ctx.reply('Elige una o varias alturas:', {
-    reply_markup: keyboardFromOptions('wave', WAVE_OPTIONS, []),
-  })
+  await ctx.reply('Pon un nombre para la alerta:')
 })
 
 bot.command('cancel', async (ctx) => {
   drafts.delete(ctx.chat.id)
   await ctx.reply('❌ Creación cancelada.')
+})
+
+bot.on('message:text', async (ctx, next) => {
+  const text = ctx.message.text.trim()
+  if (text.startsWith('/')) {
+    await next()
+    return
+  }
+
+  const d = drafts.get(ctx.chat.id)
+  if (!d || d.step !== 'name') {
+    await next()
+    return
+  }
+
+  d.name = text
+  d.step = 'wave'
+
+  await ctx.reply(`Spot fijo: ${DEFAULT_SPOT}`)
+  await ctx.reply('Elige una o varias alturas:', {
+    reply_markup: keyboardFromOptions('wave', WAVE_OPTIONS, []),
+  })
 })
 
 bot.on('callback_query:data', async (ctx) => {
@@ -461,7 +483,8 @@ bot.command('listalerts', async (ctx) => {
     const wind = a.windLabels?.join(', ') ?? 'ANY'
 
     return [
-      `#${idx + 1} · ${a.id}`,
+      `#${idx + 1} · ${a.name}`,
+      `ID: ${a.id}`,
       `Spot: ${a.spot}`,
       `Olas: ${wave}`,
       `Energía: ${energy}`,
