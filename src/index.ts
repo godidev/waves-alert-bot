@@ -441,12 +441,24 @@ bot.command('listalerts', async (ctx) => {
     return
   }
 
-  const lines = alerts.map(
-    (a) =>
-      `• ${a.id} | ${a.spot} | ola ${a.waveLabels?.join(',') ?? `${a.waveMin}-${a.waveMax}m`} | energía ${a.energyLabel ?? `${a.energyMin}-${a.energyMax}`} | periodo ${a.periodLabels?.join(',') ?? `${a.periodMin}-${a.periodMax}s`} | viento ${a.windLabels?.join(',') ?? 'ANY'}`,
-  )
+  const blocks = alerts.map((a, idx) => {
+    const wave = a.waveLabels?.join(', ') ?? `${a.waveMin}-${a.waveMax}m`
+    const energy = a.energyLabel ?? `${a.energyMin}-${a.energyMax}`
+    const period = a.periodLabels?.join(', ') ?? `${a.periodMin}-${a.periodMax}s`
+    const wind = a.windLabels?.join(', ') ?? 'ANY'
 
-  await ctx.reply(lines.join('\n'))
+    return [
+      `#${idx + 1} · ${a.id}`,
+      `Spot: ${a.spot}`,
+      `Olas: ${wave}`,
+      `Energía: ${energy}`,
+      `Periodo: ${period}`,
+      `Viento: ${wind}`,
+      `Cooldown: ${a.cooldownMin} min`,
+    ].join('\n')
+  })
+
+  await ctx.reply(`📋 Tus alertas\n\n${blocks.join('\n\n────────\n\n')}`)
 })
 
 bot.command('deletealert', async (ctx) => {
