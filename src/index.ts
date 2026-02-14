@@ -15,7 +15,7 @@ const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.
 const CHECK_INTERVAL_MIN = Number(process.env.CHECK_INTERVAL_MIN ?? 30)
 const DEFAULT_SPOT = 'sopela'
 
-type Step = 'wave' | 'energy' | 'period' | 'wind'
+type Step = 'wave' | 'energy' | 'period' | 'wind' | 'confirm'
 
 type RangeOption = { id: string; label: string; min: number; max: number }
 
@@ -52,6 +52,7 @@ interface DraftAlert {
   periodSelected: string[]
   energySelected?: string
   windSelected: string[]
+  pendingAlert?: AlertRule
 }
 
 const drafts = new Map<number, DraftAlert>()
@@ -150,6 +151,23 @@ function envelope(ranges: WindRange[]): { min: number; max: number } {
     min: Math.min(...ranges.map((r) => r.min)),
     max: Math.max(...ranges.map((r) => r.max)),
   }
+}
+
+function confirmKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text('✅ Guardar alerta', 'confirm:SAVE')
+    .text('❌ Cancelar', 'confirm:CANCEL')
+}
+
+function alertSummaryText(a: AlertRule): string {
+  return [
+    `🧾 Resumen de alerta (${a.spot})`,
+    `• Olas: ${a.waveLabels?.join(', ') ?? `${a.waveMin}-${a.waveMax}m`}`,
+    `• Energía: ${a.energyLabel ?? `${a.energyMin}-${a.energyMax}`}`,
+    `• Periodo: ${a.periodLabels?.join(', ') ?? `${a.periodMin}-${a.periodMax}s`}`,
+    `• Viento: ${a.windLabels?.join(', ') ?? 'ANY'}`,
+    `• Cooldown: ${a.cooldownMin} min`,
+  ].join('\n')
 }
 
 function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
@@ -360,10 +378,11 @@ bot.on('callback_query:data', async (ctx) => {
         await ctx.answerCallbackQuery({ text: 'Faltan datos' })
         return
       }
-      insertAlert(final)
-      drafts.delete(chatId)
-      await ctx.answerCallbackQuery({ text: 'Alerta creada' })
-      await ctx.reply(`✅ Alerta creada: ${final.id}`)
+
+      d.step = 'confirm'
+      d.pendingAlert = final
+      await ctx.answerCallbackQuery({ text: 'Revisa y confirma' })
+      await ctx.reply(alertSummaryText(final), { reply_markup: confirmKeyboard() })
       return
     }
 
@@ -373,10 +392,11 @@ bot.on('callback_query:data', async (ctx) => {
         await ctx.answerCallbackQuery({ text: 'Faltan datos' })
         return
       }
-      insertAlert(final)
-      drafts.delete(chatId)
-      await ctx.answerCallbackQuery({ text: 'Alerta creada' })
-      await ctx.reply(`✅ Alerta creada: ${final.id}`)
+
+      d.step = 'confirm'
+      d.pendingAlert = final
+      await ctx.answerCallbackQuery({ text: 'Revisa y confirma' })
+      await ctx.reply(alertSummaryText(final), { reply_markup: confirmKeyboard() })
       return
     }
 
@@ -388,6 +408,29 @@ bot.on('callback_query:data', async (ctx) => {
     d.windSelected = toggle(d.windSelected, value)
     await ctx.answerCallbackQuery({ text: `Viento: ${d.windSelected.join(', ') || 'ANY'}` })
     await ctx.editMessageReplyMarkup({ reply_markup: windKeyboard(d.windSelected) })
+    return
+  }
+
+  if (prefix === 'confirm') {
+    if (value === 'CANCEL') {
+      drafts.delete(chatId)
+      await ctx.answerCallbackQuery({ text: 'Cancelado' })
+      await ctx.reply('❌ Alerta cancelada.')
+      return
+    }
+
+    if (value === 'SAVE') {
+      if (!d.pendingAlert) {
+        await ctx.answerCallbackQuery({ text: 'No hay resumen pendiente' })
+        return
+      }
+
+      insertAlert(d.pendingAlert)
+      drafts.delete(chatId)
+      await ctx.answerCallbackQuery({ text: 'Alerta creada' })
+      await ctx.reply(`✅ Alerta creada: ${d.pendingAlert.id}`)
+      return
+    }
   }
 })
 
