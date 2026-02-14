@@ -13,8 +13,13 @@ export interface AlertRule {
   energyMax: number
   periodMin: number
   periodMax: number
+  waveRanges?: WindRange[]
+  periodRanges?: WindRange[]
   windRanges?: WindRange[]
+  waveLabels?: string[]
+  periodLabels?: string[]
   windLabels?: string[]
+  energyLabel?: string
   cooldownMin: number
   lastNotifiedAt?: string
   createdAt: string
