@@ -278,10 +278,15 @@ async function runChecks(): Promise<void> {
   }
 }
 
+const COMMANDS_HELP =
+  'Comandos:\n/setalert - crear alerta guiada\n/listalerts - listar alertas\n/deletealert <id> - borrar alerta\n/cancel - cancelar flujo actual\n/help - ver comandos'
+
 bot.command('start', async (ctx) => {
-  await ctx.reply(
-    'Bot listo.\n\nComandos:\n/setalert (guiado con botones)\n/listalerts\n/deletealert <id>\n/cancel',
-  )
+  await ctx.reply(`Bot listo.\n\n${COMMANDS_HELP}`)
+})
+
+bot.command('help', async (ctx) => {
+  await ctx.reply(COMMANDS_HELP)
 })
 
 bot.command('setalert', async (ctx) => {
@@ -505,6 +510,19 @@ bot.command('deletealert', async (ctx) => {
   }
   await ctx.reply(deleteAlert(ctx.chat.id, id) ? '🗑️ Alerta borrada' : 'No encontré esa alerta')
 })
+
+void bot.api
+  .setMyCommands([
+    { command: 'start', description: 'Iniciar bot y ver ayuda' },
+    { command: 'setalert', description: 'Crear alerta guiada' },
+    { command: 'listalerts', description: 'Ver tus alertas' },
+    { command: 'deletealert', description: 'Borrar alerta por ID' },
+    { command: 'cancel', description: 'Cancelar flujo de creación' },
+    { command: 'help', description: 'Mostrar comandos disponibles' },
+  ])
+  .catch(() => {
+    // noop
+  })
 
 bot.start()
 setInterval(() => void runChecks(), CHECK_INTERVAL_MIN * 60_000)
