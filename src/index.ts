@@ -13,7 +13,6 @@ import { degreesToCardinal, nextId, primaryPeriod, totalWaveHeight } from './uti
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.app'
 const CHECK_INTERVAL_MIN = Number(process.env.CHECK_INTERVAL_MIN ?? 30)
-const FORECAST_LOOKAHEAD_LIMIT = Number(process.env.FORECAST_LOOKAHEAD_LIMIT ?? 72)
 const DEFAULT_SPOT = 'sopela'
 
 type Step = 'wave' | 'energy' | 'period' | 'wind' | 'confirm'
@@ -239,7 +238,7 @@ function cooldownOk(alert: AlertRule): boolean {
 }
 
 async function fetchForecasts(spot: string): Promise<SurfForecast[]> {
-  const url = `${API_URL}/surf-forecast/${encodeURIComponent(spot)}?page=1&limit=${FORECAST_LOOKAHEAD_LIMIT}`
+  const url = `${API_URL}/surf-forecast/${encodeURIComponent(spot)}`
   const res = await fetch(url)
   if (!res.ok) return []
   return (await res.json()) as SurfForecast[]
