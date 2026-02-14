@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import { Bot } from 'grammy'
 import { deleteAlert, insertAlert, listAlerts, listAllAlerts, touchAlertNotified } from './storage.js'
-import type { AlertRule, Cardinal, SurfForecast } from './types.js'
+import type { AlertRule, SurfForecast } from './types.js'
 import { degreesToCardinal, nextId, primaryPeriod, totalWaveHeight } from './utils.js'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
@@ -14,10 +14,20 @@ if (!BOT_TOKEN) {
 
 const bot = new Bot(BOT_TOKEN)
 
+function normalizeAngle(deg: number): number {
+  return ((deg % 360) + 360) % 360
+}
+
 function parseRange(value: string): [number, number] | null {
   const [a, b] = value.split('-').map(Number)
-  if (!Number.isFinite(a) || !Number.isFinite(b) || a > b) return null
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null
   return [a, b]
+}
+
+function parseWindRange(value: string): [number, number] | null {
+  const range = parseRange(value)
+  if (!range) return null
+  return [normalizeAngle(range[0]), normalizeAngle(range[1])]
 }
 
 function parseSetAlert(text: string, chatId: number): AlertRule | null {
@@ -33,14 +43,16 @@ function parseSetAlert(text: string, chatId: number): AlertRule | null {
   const spot = kv.get('spot')
   const wave = kv.get('wave')
   const period = kv.get('period')
-  const wind = kv.get('wind')?.toUpperCase() as Cardinal | undefined
+  const wind = kv.get('wind')
   const cooldown = Number(kv.get('cooldown') ?? 180)
 
   if (!spot || !wave || !period) return null
 
   const waveRange = parseRange(wave)
   const periodRange = parseRange(period)
+  const windRange = wind ? parseWindRange(wind) : null
   if (!waveRange || !periodRange || !Number.isFinite(cooldown)) return null
+  if (wind && !windRange) return null
 
   return {
     id: nextId(),
@@ -50,7 +62,12 @@ function parseSetAlert(text: string, chatId: number): AlertRule | null {
     waveMax: waveRange[1],
     periodMin: periodRange[0],
     periodMax: periodRange[1],
-    windDir: wind,
+    ...(windRange
+      ? {
+          windMin: windRange[0],
+          windMax: windRange[1],
+        }
+      : {}),
     cooldownMin: cooldown,
     createdAt: new Date().toISOString(),
   }
@@ -64,14 +81,24 @@ async function fetchForecast(spot: string): Promise<SurfForecast | null> {
   return data[0] ?? null
 }
 
+function isWindInRange(
+  current: number,
+  min?: number,
+  max?: number,
+): boolean {
+  if (min === undefined || max === undefined) return true
+  if (min <= max) return current >= min && current <= max
+  return current >= min || current <= max
+}
+
 function matches(alert: AlertRule, f: SurfForecast): boolean {
   const wave = totalWaveHeight(f)
   const period = primaryPeriod(f)
-  const windDir = degreesToCardinal(f.wind.angle)
+  const windAngle = normalizeAngle(f.wind.angle)
 
   const inWave = wave >= alert.waveMin && wave <= alert.waveMax
   const inPeriod = period >= alert.periodMin && period <= alert.periodMax
-  const inWind = !alert.windDir || alert.windDir === windDir
+  const inWind = isWindInRange(windAngle, alert.windMin, alert.windMax)
 
   return inWave && inPeriod && inWind
 }
@@ -111,7 +138,7 @@ async function runChecks(): Promise<void> {
 
 bot.command('start', async (ctx) => {
   await ctx.reply(
-    'Bot de alertas listo.\n\nUsa:\n/setalert spot=sopelana wave=0.8-1.6 period=8-14 wind=NW cooldown=180\n/listalerts\n/deletealert <id>',
+    'Bot de alertas listo.\n\nUsa:\n/setalert spot=sopelana wave=0.8-1.6 period=8-14 wind=240-300 cooldown=180\n/listalerts\n/deletealert <id>',
   )
 })
 
@@ -119,7 +146,7 @@ bot.command('setalert', async (ctx) => {
   const parsed = parseSetAlert(ctx.message?.text ?? '', ctx.chat.id)
   if (!parsed) {
     await ctx.reply(
-      'Formato:\n/setalert spot=sopelana wave=0.8-1.6 period=8-14 wind=NW cooldown=180',
+      'Formato:\n/setalert spot=sopelana wave=0.8-1.6 period=8-14 wind=240-300 cooldown=180',
     )
     return
   }
@@ -137,7 +164,7 @@ bot.command('listalerts', async (ctx) => {
 
   const lines = alerts.map(
     (a) =>
-      `• ${a.id} | ${a.spot} | ola ${a.waveMin}-${a.waveMax}m | periodo ${a.periodMin}-${a.periodMax}s | viento ${a.windDir ?? 'ANY'} | cooldown ${a.cooldownMin}m`,
+      `• ${a.id} | ${a.spot} | ola ${a.waveMin}-${a.waveMax}m | periodo ${a.periodMin}-${a.periodMax}s | viento ${a.windMin !== undefined && a.windMax !== undefined ? `${a.windMin}-${a.windMax}°` : 'ANY'} | cooldown ${a.cooldownMin}m`,
   )
 
   await ctx.reply(lines.join('\n'))

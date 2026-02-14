@@ -1,5 +1,3 @@
-export type Cardinal = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW'
-
 export interface AlertRule {
   id: string
   chatId: number
@@ -8,7 +6,8 @@ export interface AlertRule {
   waveMax: number
   periodMin: number
   periodMax: number
-  windDir?: Cardinal
+  windMin?: number
+  windMax?: number
   cooldownMin: number
   lastNotifiedAt?: string
   createdAt: string

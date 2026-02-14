@@ -1,4 +1,6 @@
-import type { Cardinal, SurfForecast } from './types.js'
+import type { SurfForecast } from './types.js'
+
+type Cardinal = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW'
 
 export function totalWaveHeight(f: SurfForecast): number {
   if (!f.validSwells.length) return 0
