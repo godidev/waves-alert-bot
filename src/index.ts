@@ -13,6 +13,7 @@ import { degreesToCardinal, nextId, primaryPeriod, totalWaveHeight } from './uti
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.app'
 const CHECK_INTERVAL_MIN = Number(process.env.CHECK_INTERVAL_MIN ?? 30)
+const FORECAST_LOOKAHEAD_LIMIT = Number(process.env.FORECAST_LOOKAHEAD_LIMIT ?? 72)
 const DEFAULT_SPOT = 'sopela'
 
 type Step = 'wave' | 'energy' | 'period' | 'wind' | 'confirm'
@@ -237,23 +238,36 @@ function cooldownOk(alert: AlertRule): boolean {
   return Date.now() - last >= alert.cooldownMin * 60_000
 }
 
-async function fetchForecast(spot: string): Promise<SurfForecast | null> {
-  const url = `${API_URL}/surf-forecast/${encodeURIComponent(spot)}?page=1&limit=1`
+async function fetchForecasts(spot: string): Promise<SurfForecast[]> {
+  const url = `${API_URL}/surf-forecast/${encodeURIComponent(spot)}?page=1&limit=${FORECAST_LOOKAHEAD_LIMIT}`
   const res = await fetch(url)
-  if (!res.ok) return null
-  const data = (await res.json()) as SurfForecast[]
-  return data[0] ?? null
+  if (!res.ok) return []
+  return (await res.json()) as SurfForecast[]
 }
 
 async function runChecks(): Promise<void> {
   for (const alert of listAllAlerts()) {
     try {
-      const f = await fetchForecast(alert.spot)
-      if (!f || !matches(alert, f) || !cooldownOk(alert)) continue
+      const forecasts = await fetchForecasts(alert.spot)
+      if (!forecasts.length || !cooldownOk(alert)) continue
+
+      const matchesFound = forecasts.filter((f) => matches(alert, f))
+      if (!matchesFound.length) continue
+
+      const first = matchesFound[0]
+      const firstDate = new Date(first.date)
+      const dateText = Number.isNaN(firstDate.getTime())
+        ? first.date
+        : firstDate.toLocaleString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
 
       await bot.api.sendMessage(
         alert.chatId,
-        `🌊 ALERTA ${alert.spot}\nOla: ${totalWaveHeight(f).toFixed(2)}m\nPeriodo: ${primaryPeriod(f).toFixed(1)}s\nEnergía: ${f.energy.toFixed(0)}\nViento: ${degreesToCardinal(f.wind.angle)} (${f.wind.angle.toFixed(0)}°)`,
+        `🌊 ALERTA ${alert.spot}\nCoincidencias próximas horas: ${matchesFound.length}\nPrimera: ${dateText}\nOla: ${totalWaveHeight(first).toFixed(2)}m\nPeriodo: ${primaryPeriod(first).toFixed(1)}s\nEnergía: ${first.energy.toFixed(0)}\nViento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)`,
       )
       touchAlertNotified(alert.id, new Date().toISOString())
     } catch {
