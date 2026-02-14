@@ -113,17 +113,17 @@ function parseNumber(text: string): number | null {
 
 function windKeyboard(): InlineKeyboard {
   return new InlineKeyboard()
-    .text('N ↑ (337-22°)', 'wind:N')
-    .text('NE ↗ (22-67°)', 'wind:NE')
+    .text('N ↓ (337-22°)', 'wind:N')
+    .text('NE ↙ (22-67°)', 'wind:NE')
     .row()
-    .text('E → (67-112°)', 'wind:E')
-    .text('SE ↘ (112-157°)', 'wind:SE')
+    .text('E ← (67-112°)', 'wind:E')
+    .text('SE ↖ (112-157°)', 'wind:SE')
     .row()
-    .text('S ↓ (157-202°)', 'wind:S')
-    .text('SW ↙ (202-247°)', 'wind:SW')
+    .text('S ↑ (157-202°)', 'wind:S')
+    .text('SW ↗ (202-247°)', 'wind:SW')
     .row()
-    .text('W ← (247-292°)', 'wind:W')
-    .text('NW ↖ (292-337°)', 'wind:NW')
+    .text('W → (247-292°)', 'wind:W')
+    .text('NW ↘ (292-337°)', 'wind:NW')
     .row()
     .text('ANY (sin filtro)', 'wind:ANY')
 }
@@ -261,15 +261,24 @@ bot.on('callback_query:data', async (ctx) => {
   await ctx.reply(`✅ Alerta creada: ${finalAlert.id}`)
 })
 
-bot.on('message:text', async (ctx) => {
+bot.on('message:text', async (ctx, next) => {
   const text = ctx.message.text.trim()
-  if (text.startsWith('/')) return
+  if (text.startsWith('/')) {
+    await next()
+    return
+  }
 
   const chatId = ctx.chat?.id
-  if (!chatId) return
+  if (!chatId) {
+    await next()
+    return
+  }
 
   const d = drafts.get(chatId)
-  if (!d) return
+  if (!d) {
+    await next()
+    return
+  }
 
   const value = parseNumber(text)
   if (value === null) {
