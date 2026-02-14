@@ -1,3 +1,8 @@
+export interface WindRange {
+  min: number
+  max: number
+}
+
 export interface AlertRule {
   id: string
   chatId: number
@@ -8,8 +13,8 @@ export interface AlertRule {
   energyMax: number
   periodMin: number
   periodMax: number
-  windMin?: number
-  windMax?: number
+  windRanges?: WindRange[]
+  windLabels?: string[]
   cooldownMin: number
   lastNotifiedAt?: string
   createdAt: string

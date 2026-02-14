@@ -33,6 +33,7 @@ interface DraftAlert {
   energyMax?: number
   periodMin?: number
   periodMax?: number
+  windSelected: string[]
 }
 
 const drafts = new Map<number, DraftAlert>()
@@ -45,8 +46,7 @@ function normalizeAngle(deg: number): number {
   return ((deg % 360) + 360) % 360
 }
 
-function isWindInRange(current: number, min?: number, max?: number): boolean {
-  if (min === undefined || max === undefined) return true
+function isWindInRange(current: number, min: number, max: number): boolean {
   if (min <= max) return current >= min && current <= max
   return current >= min || current <= max
 }
@@ -68,7 +68,9 @@ function matches(alert: AlertRule, f: SurfForecast): boolean {
   const inWave = wave >= alert.waveMin && wave <= alert.waveMax
   const inEnergy = energy >= alert.energyMin && energy <= alert.energyMax
   const inPeriod = period >= alert.periodMin && period <= alert.periodMax
-  const inWind = isWindInRange(windAngle, alert.windMin, alert.windMax)
+  const inWind =
+    !alert.windRanges?.length ||
+    alert.windRanges.some((r) => isWindInRange(windAngle, r.min, r.max))
 
   return inWave && inEnergy && inPeriod && inWind
 }
@@ -111,21 +113,24 @@ function parseNumber(text: string): number | null {
   return Number.isFinite(value) ? value : null
 }
 
-function windKeyboard(): InlineKeyboard {
+function windKeyboard(selected: string[] = []): InlineKeyboard {
+  const on = (d: string) => (selected.includes(d) ? '✅ ' : '')
+
   return new InlineKeyboard()
-    .text('N ↓ (337-22°)', 'wind:N')
-    .text('NE ↙ (22-67°)', 'wind:NE')
+    .text(`${on('N')}N ↓ (337-22°)`, 'wind:N')
+    .text(`${on('NE')}NE ↙ (22-67°)`, 'wind:NE')
     .row()
-    .text('E ← (67-112°)', 'wind:E')
-    .text('SE ↖ (112-157°)', 'wind:SE')
+    .text(`${on('E')}E ← (67-112°)`, 'wind:E')
+    .text(`${on('SE')}SE ↖ (112-157°)`, 'wind:SE')
     .row()
-    .text('S ↑ (157-202°)', 'wind:S')
-    .text('SW ↗ (202-247°)', 'wind:SW')
+    .text(`${on('S')}S ↑ (157-202°)`, 'wind:S')
+    .text(`${on('SW')}SW ↗ (202-247°)`, 'wind:SW')
     .row()
-    .text('W → (247-292°)', 'wind:W')
-    .text('NW ↘ (292-337°)', 'wind:NW')
+    .text(`${on('W')}W → (247-292°)`, 'wind:W')
+    .text(`${on('NW')}NW ↘ (292-337°)`, 'wind:NW')
     .row()
     .text('ANY (sin filtro)', 'wind:ANY')
+    .text('✅ Confirmar', 'wind:DONE')
 }
 
 function windSector(dir: string): [number, number] | null {
@@ -210,6 +215,7 @@ bot.command('setalert', async (ctx) => {
   drafts.set(ctx.chat.id, {
     step: 'waveMin',
     spot: DEFAULT_SPOT,
+    windSelected: [],
   })
 
   await ctx.reply(`Vamos a crear la alerta para spot: ${DEFAULT_SPOT}`)
@@ -235,30 +241,64 @@ bot.on('callback_query:data', async (ctx) => {
   }
 
   const value = data.replace('wind:', '')
-  const alertBase = draftToAlert(chatId, d)
-  if (!alertBase) {
-    await ctx.answerCallbackQuery({ text: 'Faltan datos previos.' })
+
+  if (value === 'ANY') {
+    const alertBase = draftToAlert(chatId, d)
+    if (!alertBase) {
+      await ctx.answerCallbackQuery({ text: 'Faltan datos previos.' })
+      return
+    }
+
+    insertAlert(alertBase)
+    drafts.delete(chatId)
+    await ctx.answerCallbackQuery({ text: 'Alerta creada sin filtro de viento' })
+    await ctx.reply(`✅ Alerta creada: ${alertBase.id}`)
     return
   }
 
-  const finalAlert: AlertRule =
-    value === 'ANY'
-      ? alertBase
-      : (() => {
-          const range = windSector(value)
-          if (!range) return alertBase
-          return {
-            ...alertBase,
-            windMin: range[0],
-            windMax: range[1],
-          }
-        })()
+  if (value === 'DONE') {
+    const alertBase = draftToAlert(chatId, d)
+    if (!alertBase) {
+      await ctx.answerCallbackQuery({ text: 'Faltan datos previos.' })
+      return
+    }
 
-  insertAlert(finalAlert)
-  drafts.delete(chatId)
+    if (!d.windSelected.length) {
+      await ctx.answerCallbackQuery({ text: 'Elige al menos una dirección o ANY' })
+      return
+    }
 
-  await ctx.answerCallbackQuery({ text: 'Alerta creada' })
-  await ctx.reply(`✅ Alerta creada: ${finalAlert.id}`)
+    const ranges = d.windSelected
+      .map((dir) => windSector(dir))
+      .filter((r): r is [number, number] => Boolean(r))
+      .map(([min, max]) => ({ min, max }))
+
+    const finalAlert: AlertRule = {
+      ...alertBase,
+      windRanges: ranges,
+      windLabels: [...d.windSelected],
+    }
+
+    insertAlert(finalAlert)
+    drafts.delete(chatId)
+    await ctx.answerCallbackQuery({ text: 'Alerta creada' })
+    await ctx.reply(`✅ Alerta creada: ${finalAlert.id}`)
+    return
+  }
+
+  if (!windSector(value)) {
+    await ctx.answerCallbackQuery({ text: 'Dirección inválida' })
+    return
+  }
+
+  d.windSelected = d.windSelected.includes(value)
+    ? d.windSelected.filter((x) => x !== value)
+    : [...d.windSelected, value]
+
+  await ctx.answerCallbackQuery({
+    text: `Seleccionadas: ${d.windSelected.join(', ') || 'ninguna'}`,
+  })
+  await ctx.editMessageReplyMarkup({ reply_markup: windKeyboard(d.windSelected) })
 })
 
 bot.on('message:text', async (ctx, next) => {
@@ -327,7 +367,10 @@ bot.on('message:text', async (ctx, next) => {
       }
       d.periodMax = value
       d.step = 'wind'
-      await ctx.reply(await askNext(chatId), { reply_markup: windKeyboard() })
+      d.windSelected = []
+      await ctx.reply(await askNext(chatId), {
+        reply_markup: windKeyboard(d.windSelected),
+      })
       return
     case 'wind':
       await ctx.reply('Pulsa una opción de viento en los botones.')
@@ -344,7 +387,7 @@ bot.command('listalerts', async (ctx) => {
 
   const lines = alerts.map(
     (a) =>
-      `• ${a.id} | ${a.spot} | ola ${a.waveMin}-${a.waveMax}m | energía ${a.energyMin}-${a.energyMax} | periodo ${a.periodMin}-${a.periodMax}s | viento ${a.windMin !== undefined && a.windMax !== undefined ? `${a.windMin}-${a.windMax}°` : 'ANY'} | cooldown ${a.cooldownMin}m`,
+      `• ${a.id} | ${a.spot} | ola ${a.waveMin}-${a.waveMax}m | energía ${a.energyMin}-${a.energyMax} | periodo ${a.periodMin}-${a.periodMax}s | viento ${a.windLabels?.length ? a.windLabels.join(',') : 'ANY'} | cooldown ${a.cooldownMin}m`,
   )
 
   await ctx.reply(lines.join('\n'))

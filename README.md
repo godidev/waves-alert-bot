@@ -21,10 +21,11 @@ npm run dev
 1. Altura mínima / máxima
 2. Energía mínima / máxima
 3. Periodo mínimo / máximo
-4. Viento (8 opciones: N/NE/E/SE/S/SW/W/NW con grados y flecha)
+4. Viento (8 opciones: N/NE/E/SE/S/SW/W/NW con grados y flecha, selección múltiple)
 
 ## Notas
 - Spot fijo por ahora: `sopela`.
 - El bot revisa condiciones cada `CHECK_INTERVAL_MIN` (default 30).
 - Guarda alertas en `data/alerts.json`.
-- Viento se guarda como rango numérico de ángulo (0-360), incluyendo rangos circulares.
+- Puedes seleccionar varias direcciones de viento antes de confirmar.
+- Viento se guarda como uno o varios rangos numéricos de ángulo (0-360), incluyendo rangos circulares.
