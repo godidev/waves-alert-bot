@@ -13,6 +13,7 @@ import { degreesToCardinal, nextId, primaryPeriod, totalWaveHeight } from './uti
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.app'
 const CHECK_INTERVAL_MIN = Number(process.env.CHECK_INTERVAL_MIN ?? 30)
+const MIN_CONSECUTIVE_HOURS = Number(process.env.MIN_CONSECUTIVE_HOURS ?? 2)
 const DEFAULT_SPOT = 'sopelana'
 
 type Step = 'name' | 'wave' | 'energy' | 'period' | 'wind' | 'tidePort' | 'tidePref' | 'confirm'
@@ -448,6 +449,46 @@ async function fetchForecasts(spot: string): Promise<SurfForecast[]> {
   return (await res.json()) as SurfForecast[]
 }
 
+type CandidateMatch = {
+  forecast: SurfForecast
+  tideClass: 'low' | 'mid' | 'high' | null
+  tideHeight: number | null
+}
+
+function firstConsecutiveWindow(
+  items: CandidateMatch[],
+  minHours: number,
+): { start: CandidateMatch; hours: number } | null {
+  if (!items.length) return null
+
+  const sorted = [...items].sort(
+    (a, b) => new Date(a.forecast.date).getTime() - new Date(b.forecast.date).getTime(),
+  )
+
+  let streakStart = 0
+  let streakLen = 1
+
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = new Date(sorted[i - 1].forecast.date).getTime()
+    const cur = new Date(sorted[i].forecast.date).getTime()
+    const diff = cur - prev
+
+    if (diff === 60 * 60 * 1000) {
+      streakLen++
+    } else {
+      streakStart = i
+      streakLen = 1
+    }
+
+    if (streakLen >= minHours) {
+      return { start: sorted[streakStart], hours: streakLen }
+    }
+  }
+
+  if (minHours <= 1) return { start: sorted[0], hours: 1 }
+  return null
+}
+
 async function runChecks(): Promise<void> {
   for (const alert of listAllAlerts()) {
     try {
@@ -457,9 +498,7 @@ async function runChecks(): Promise<void> {
       const matchesFound = forecasts.filter((f) => matches(alert, f))
       if (!matchesFound.length) continue
 
-      let first: SurfForecast | null = null
-      let firstTideClass: 'low' | 'mid' | 'high' | null = null
-      let firstTideHeight: number | null = null
+      const candidateMatches: CandidateMatch[] = []
 
       for (const candidate of matchesFound) {
         const targetDate = new Date(candidate.date)
@@ -472,34 +511,33 @@ async function runChecks(): Promise<void> {
         const yyyymmdd = apiDateFromForecastDate(candidate.date)
         const tideEvents = await getTideEventsForDate(tidePortId, yyyymmdd)
 
+        let tideClass: 'low' | 'mid' | 'high' | null = null
+        let tideHeight: number | null = null
+
         if (tideEvents.length) {
-          const tideHeight = estimateTideHeightAt(targetDate, tideEvents)
-          if (tideHeight != null) {
+          const estimated = estimateTideHeightAt(targetDate, tideEvents)
+          if (estimated != null) {
             const min = Math.min(...tideEvents.map((e) => e.altura))
             const max = Math.max(...tideEvents.map((e) => e.altura))
-            firstTideClass = tideClassByHeight(tideHeight, min, max)
-            firstTideHeight = tideHeight
+            tideClass = tideClassByHeight(estimated, min, max)
+            tideHeight = estimated
           }
         }
 
-        if (
-          alert.tidePreference &&
-          alert.tidePreference !== 'any' &&
-          firstTideClass &&
-          firstTideClass !== alert.tidePreference
-        ) {
-          continue
+        if (alert.tidePreference && alert.tidePreference !== 'any') {
+          if (!tideClass) continue
+          if (tideClass !== alert.tidePreference) continue
         }
 
-        if (alert.tidePreference && alert.tidePreference !== 'any' && !firstTideClass) {
-          continue
-        }
-
-        first = candidate
-        break
+        candidateMatches.push({ forecast: candidate, tideClass, tideHeight })
       }
 
-      if (!first) continue
+      const window = firstConsecutiveWindow(candidateMatches, Math.max(1, MIN_CONSECUTIVE_HOURS))
+      if (!window) continue
+
+      const first = window.start.forecast
+      const firstTideClass = window.start.tideClass
+      const firstTideHeight = window.start.tideHeight
 
       const firstDate = new Date(first.date)
       const dateText = Number.isNaN(firstDate.getTime())
@@ -519,7 +557,7 @@ async function runChecks(): Promise<void> {
 
       await bot.api.sendMessage(
         alert.chatId,
-        `🌊 ALERTA: ${alert.name}\nSpot: ${alert.spot}\nCoincidencias próximas horas: ${matchesFound.length}\nPrimera: ${dateText}\nOla: ${totalWaveHeight(first).toFixed(2)}m\nPeriodo: ${primaryPeriod(first).toFixed(1)}s\nEnergía: ${first.energy.toFixed(0)}\nViento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)${tideText}`,
+        `🌊 ALERTA: ${alert.name}\nSpot: ${alert.spot}\nVentana válida: ${window.hours}h seguidas (mín ${Math.max(1, MIN_CONSECUTIVE_HOURS)}h)\nCoincidencias próximas horas: ${candidateMatches.length}\nPrimera: ${dateText}\nOla: ${totalWaveHeight(first).toFixed(2)}m\nPeriodo: ${primaryPeriod(first).toFixed(1)}s\nEnergía: ${first.energy.toFixed(0)}\nViento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)${tideText}`,
       )
       touchAlertNotified(alert.id, new Date().toISOString())
     } catch {

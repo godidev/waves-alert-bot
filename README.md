@@ -43,6 +43,7 @@ pm2 save
 - Spot fijo por ahora: `sopelana`.
 - El bot revisa condiciones cada `CHECK_INTERVAL_MIN` (default 30).
 - Solo notifica en ventana de luz: desde las 05:00 hasta 1h después de la puesta de sol (hora local).
+- Solo alerta cuando hay una racha mínima de horas consecutivas cumpliendo condiciones (`MIN_CONSECUTIVE_HOURS`, default `2`).
 - El mensaje de alerta incluye marea estimada en el momento del aviso.
 - Guarda alertas en `data/alerts.json`.
 - El bot convierte selecciones múltiples en rangos internos para evaluar alertas.
