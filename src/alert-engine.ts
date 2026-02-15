@@ -1,5 +1,10 @@
-import type { AlertRule, SurfForecast, WindRange } from './types.js'
-import { degreesToCardinal, primaryPeriod, totalWaveHeight } from './utils.js'
+import type { AlertRule, SurfForecast } from './types.js'
+import {
+  degreesToCardinal,
+  normalizeAngle,
+  primaryPeriod,
+  totalWaveHeight,
+} from './utils.js'
 
 export type TideEvent = {
   date: string
@@ -12,10 +17,6 @@ export type CandidateMatch = {
   forecast: SurfForecast
   tideClass: 'low' | 'mid' | 'high' | null
   tideHeight: number | null
-}
-
-export function normalizeAngle(deg: number): number {
-  return ((deg % 360) + 360) % 360
 }
 
 function isInRange(current: number, min: number, max: number): boolean {
@@ -189,8 +190,4 @@ export function buildAlertMessage(params: {
     tideLine('Bajamar más cercana', nearestTides.low),
     tideLine('Pleamar más cercana', nearestTides.high),
   ].join('\n')
-}
-
-export function toRange(min: number, max: number): WindRange {
-  return { min, max }
 }

@@ -232,8 +232,8 @@ export async function runChecksWithDeps(deps: CheckRunnerDeps): Promise<void> {
       await deps.sendMessage(alert.chatId, message)
       deps.setLastWindow?.(dedupeKey, newWindow)
       deps.touchAlertNotified(alert.id, new Date(now()).toISOString())
-    } catch {
-      // noop
+    } catch (err) {
+      console.error(`check_alert_error alert=${alert.id}`, err)
     }
   }
 }

@@ -57,6 +57,17 @@ export const TIDE_PREF_OPTIONS = [
   { id: 'high', label: 'Alta' },
 ] as const
 
+export const WIND_SECTORS = [
+  { id: 'N', label: 'N ↓', min: 337.5, max: 22.5 },
+  { id: 'NE', label: 'NE ↙', min: 22.5, max: 67.5 },
+  { id: 'E', label: 'E ←', min: 67.5, max: 112.5 },
+  { id: 'SE', label: 'SE ↖', min: 112.5, max: 157.5 },
+  { id: 'S', label: 'S ↑', min: 157.5, max: 202.5 },
+  { id: 'SW', label: 'SW ↗', min: 202.5, max: 247.5 },
+  { id: 'W', label: 'W →', min: 247.5, max: 292.5 },
+  { id: 'NW', label: 'NW ↘', min: 292.5, max: 337.5 },
+] as const
+
 export type TidePreferenceId = (typeof TIDE_PREF_OPTIONS)[number]['id']
 
 export interface DraftAlert {

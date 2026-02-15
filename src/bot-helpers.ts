@@ -5,16 +5,22 @@ import {
   PERIOD_OPTIONS,
   TIDE_PORT_OPTIONS,
   WAVE_OPTIONS,
+  WIND_SECTORS,
 } from './bot-options.js'
 import { nextId } from './utils.js'
 import type { AlertRule, SurfForecast, WindRange } from './types.js'
 
+const MAX_CACHE_ENTRIES = 100
 const sunsetCache = new Map<string, Date>()
 const tideDayCache = new Map<string, TideEvent[]>()
 
+function boundedSet<K, V>(cache: Map<K, V>, key: K, value: V): void {
+  if (cache.size >= MAX_CACHE_ENTRIES) cache.clear()
+  cache.set(key, value)
+}
+
 const SPOT_COORDS: Record<string, { lat: number; lng: number }> = {
   sopelana: { lat: 43.3798, lng: -2.9808 },
-  sopela: { lat: 43.3798, lng: -2.9808 },
 }
 
 export function toggle(selected: string[], id: string): string[] {
@@ -24,26 +30,9 @@ export function toggle(selected: string[], id: string): string[] {
 }
 
 export function windSector(dir: string): [number, number] | null {
-  switch (dir) {
-    case 'N':
-      return [337.5, 22.5]
-    case 'NE':
-      return [22.5, 67.5]
-    case 'E':
-      return [67.5, 112.5]
-    case 'SE':
-      return [112.5, 157.5]
-    case 'S':
-      return [157.5, 202.5]
-    case 'SW':
-      return [202.5, 247.5]
-    case 'W':
-      return [247.5, 292.5]
-    case 'NW':
-      return [292.5, 337.5]
-    default:
-      return null
-  }
+  const sector = WIND_SECTORS.find((s) => s.id === dir)
+  if (!sector) return null
+  return [sector.min, sector.max]
 }
 
 function toRanges(selected: string[], options: RangeOption[]): WindRange[] {
@@ -96,14 +85,13 @@ export function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
       TIDE_PORT_OPTIONS.find((p) => p.id === (d.tidePortId ?? '72'))?.label ??
       'Bermeo',
     tidePreference: d.tidePreference ?? 'any',
-    lastNotifiedAt: undefined,
     createdAt: new Date().toISOString(),
     waveRanges,
     periodRanges,
     waveLabels: [...d.waveSelected],
     periodLabels: [...d.periodSelected],
     energyLabel: energyOpt.label,
-  } as AlertRule
+  }
 }
 
 export function tideTag(pref: AlertRule['tidePreference']): string {
@@ -181,7 +169,7 @@ async function getSunsetDate(spot: string, date: Date): Promise<Date | null> {
   const sunset = new Date(rawSunset)
   if (Number.isNaN(sunset.getTime())) return null
 
-  sunsetCache.set(cacheKey, sunset)
+  boundedSet(sunsetCache, cacheKey, sunset)
   return sunset
 }
 
@@ -230,7 +218,7 @@ export async function getTideEventsForDate(
     tipo: m.tipo ?? '',
   }))
 
-  tideDayCache.set(cacheKey, out)
+  boundedSet(tideDayCache, cacheKey, out)
   return out
 }
 

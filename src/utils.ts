@@ -16,9 +16,13 @@ export function primaryPeriod(f: SurfForecast): number {
   return primary.period
 }
 
+export function normalizeAngle(deg: number): number {
+  return ((deg % 360) + 360) % 360
+}
+
 export function degreesToCardinal(deg: number): Cardinal {
   const dirs: Cardinal[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
-  const index = Math.round((((deg % 360) + 360) % 360) / 45) % 8
+  const index = Math.round(normalizeAngle(deg) / 45) % 8
   return dirs[index]
 }
 

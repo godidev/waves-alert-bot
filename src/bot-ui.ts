@@ -1,6 +1,10 @@
 import { GrammyError, InlineKeyboard } from 'grammy'
 import type { RangeOption, TidePreferenceId } from './bot-options.js'
-import { TIDE_PORT_OPTIONS, TIDE_PREF_OPTIONS } from './bot-options.js'
+import {
+  TIDE_PORT_OPTIONS,
+  TIDE_PREF_OPTIONS,
+  WIND_SECTORS,
+} from './bot-options.js'
 
 interface EditReplyMarkupContext {
   editMessageReplyMarkup: (options: {
@@ -43,22 +47,17 @@ export function keyboardFromOptions(
 }
 
 export function windKeyboard(selected: string[]): InlineKeyboard {
-  const on = (d: string) => (selected.includes(d) ? '✅ ' : '')
-  return new InlineKeyboard()
-    .text(`${on('N')}N ↓ (337-22°)`, 'wind:N')
-    .text(`${on('NE')}NE ↙ (22-67°)`, 'wind:NE')
-    .row()
-    .text(`${on('E')}E ← (67-112°)`, 'wind:E')
-    .text(`${on('SE')}SE ↖ (112-157°)`, 'wind:SE')
-    .row()
-    .text(`${on('S')}S ↑ (157-202°)`, 'wind:S')
-    .text(`${on('SW')}SW ↗ (202-247°)`, 'wind:SW')
-    .row()
-    .text(`${on('W')}W → (247-292°)`, 'wind:W')
-    .text(`${on('NW')}NW ↘ (292-337°)`, 'wind:NW')
-    .row()
-    .text('ANY (sin filtro)', 'wind:ANY')
-    .text('✅ Confirmar', 'wind:DONE')
+  const kb = new InlineKeyboard()
+  WIND_SECTORS.forEach((s, idx) => {
+    const prefix = selected.includes(s.id) ? '✅ ' : ''
+    kb.text(
+      `${prefix}${s.label} (${Math.floor(s.min)}-${Math.floor(s.max)}°)`,
+      `wind:${s.id}`,
+    )
+    if (idx % 2 === 1) kb.row()
+  })
+  kb.text('ANY (sin filtro)', 'wind:ANY').text('✅ Confirmar', 'wind:DONE')
+  return kb
 }
 
 export function tidePortKeyboard(selected?: string): InlineKeyboard {
