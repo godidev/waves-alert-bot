@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAlertMessage, findNearestTides, firstConsecutiveWindow, matches } from './alert-engine.js'
-import type { AlertRule, SurfForecast } from './types.js'
+import { buildAlertMessage, findNearestTides, firstConsecutiveWindow, matches } from '../src/alert-engine.js'
+import type { AlertRule, SurfForecast } from '../src/types.js'
 
 function mkForecast(date: string, energy = 1200, windAngle = 45, height = 1.5, period = 11): SurfForecast {
   return {

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildCleanupDeleteList } from './flow-cleanup.js'
+import { buildCleanupDeleteList } from '../src/flow-cleanup.js'
 
 test('buildCleanupDeleteList elimina duplicados y conserva solo confirmación final', () => {
   const ids = [10, 11, 12, 11, 13]

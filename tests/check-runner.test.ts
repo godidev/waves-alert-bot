@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runChecksWithDeps, shouldSendWindow } from './check-runner.js'
-import type { AlertRule, SurfForecast } from './types.js'
-import type { TideEvent } from './alert-engine.js'
+import { runChecksWithDeps, shouldSendWindow } from '../src/check-runner.js'
+import type { AlertRule, SurfForecast } from '../src/types.js'
+import type { TideEvent } from '../src/alert-engine.js'
 
 function mkAlert(overrides: Partial<AlertRule> = {}): AlertRule {
   return {
