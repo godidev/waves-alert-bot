@@ -49,23 +49,43 @@ function envelope(ranges: WindRange[]): { min: number; max: number } {
   }
 }
 
+function envelopeWind(ranges: WindRange[]): { min: number; max: number } {
+  const boundaries = ranges.flatMap((r) => {
+    if (r.min <= r.max) return [r.min, r.max]
+    return [0, r.max, r.min, 360]
+  })
+
+  return {
+    min: Math.min(...boundaries),
+    max: Math.max(...boundaries),
+  }
+}
+
 export function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
-  if (!d.waveSelected.length || !d.periodSelected.length || !d.energySelected) {
+  if (
+    !d.waveSelected.length ||
+    !d.periodSelected.length ||
+    !d.energySelected.length
+  ) {
     return null
   }
 
   const waveRanges = toRanges(d.waveSelected, WAVE_OPTIONS)
   const periodRanges = toRanges(d.periodSelected, PERIOD_OPTIONS)
-  const energyOpt = ENERGY_OPTIONS.find((e) => e.id === d.energySelected)
-  if (!waveRanges.length || !periodRanges.length || !energyOpt) return null
+  const energyRanges = toRanges(d.energySelected, ENERGY_OPTIONS)
+  if (!waveRanges.length || !periodRanges.length || !energyRanges.length)
+    return null
 
   const waveEnv = envelope(waveRanges)
   const periodEnv = envelope(periodRanges)
+  const energyEnv = envelope(energyRanges)
 
   const windRanges = d.windSelected
     .map((w) => windSector(w))
     .filter((w): w is [number, number] => Boolean(w))
     .map(([min, max]) => ({ min, max }))
+
+  const windEnv = windRanges.length ? envelopeWind(windRanges) : null
 
   return {
     id: nextId(),
@@ -74,11 +94,13 @@ export function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
     spot: d.spot,
     waveMin: waveEnv.min,
     waveMax: waveEnv.max,
-    energyMin: energyOpt.min,
-    energyMax: energyOpt.max,
+    energyMin: energyEnv.min,
+    energyMax: energyEnv.max,
     periodMin: periodEnv.min,
     periodMax: periodEnv.max,
-    windRanges: windRanges.length ? windRanges : undefined,
+    waveRanges: [{ min: waveEnv.min, max: waveEnv.max }],
+    periodRanges: [{ min: periodEnv.min, max: periodEnv.max }],
+    windRanges: windEnv ? [{ min: windEnv.min, max: windEnv.max }] : undefined,
     windLabels: d.windSelected.length ? d.windSelected : undefined,
     tidePortId: d.tidePortId ?? '72',
     tidePortName:
@@ -86,11 +108,12 @@ export function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
       'Bermeo',
     tidePreference: d.tidePreference ?? 'any',
     createdAt: new Date().toISOString(),
-    waveRanges,
-    periodRanges,
     waveLabels: [...d.waveSelected],
     periodLabels: [...d.periodSelected],
-    energyLabel: energyOpt.label,
+    energyLabel: d.energySelected
+      .map((id) => ENERGY_OPTIONS.find((e) => e.id === id)?.label)
+      .filter((x): x is string => Boolean(x))
+      .join(', '),
   }
 }
 

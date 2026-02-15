@@ -20,14 +20,14 @@ export type RangeOption = {
 }
 
 export const WAVE_OPTIONS: RangeOption[] = [
-  { id: '0.5', label: '0.5m', min: 0.5, max: 0.5 },
-  { id: '1.0', label: '1.0m', min: 1.0, max: 1.0 },
-  { id: '1.5', label: '1.5m', min: 1.5, max: 1.5 },
-  { id: '2.0', label: '2.0m', min: 2.0, max: 2.0 },
-  { id: '2.5', label: '2.5m', min: 2.5, max: 2.5 },
-  { id: '3.0', label: '3.0m', min: 3.0, max: 3.0 },
-  { id: '3.5', label: '3.5m', min: 3.5, max: 3.5 },
-  { id: '4.0', label: '4.0m', min: 4.0, max: 4.0 },
+  { id: '0.5-1.0', label: '0.5-1.0m', min: 0.5, max: 1.0 },
+  { id: '1.0-1.5', label: '1.0-1.5m', min: 1.0, max: 1.5 },
+  { id: '1.5-2.0', label: '1.5-2.0m', min: 1.5, max: 2.0 },
+  { id: '2.0-2.5', label: '2.0-2.5m', min: 2.0, max: 2.5 },
+  { id: '2.5-3.0', label: '2.5-3.0m', min: 2.5, max: 3.0 },
+  { id: '3.0-3.5', label: '3.0-3.5m', min: 3.0, max: 3.5 },
+  { id: '3.5-4.0', label: '3.5-4.0m', min: 3.5, max: 4.0 },
+  { id: '4.0+', label: '4.0m+', min: 4.0, max: 99 },
 ]
 
 export const PERIOD_OPTIONS: RangeOption[] = [
@@ -76,7 +76,7 @@ export interface DraftAlert {
   spot: string
   waveSelected: string[]
   periodSelected: string[]
-  energySelected?: string
+  energySelected: string[]
   windSelected: string[]
   tidePortId?: string
   tidePreference?: TidePreferenceId

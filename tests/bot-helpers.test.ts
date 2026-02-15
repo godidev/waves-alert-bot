@@ -1,0 +1,48 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { draftToAlert } from '../src/bot-helpers.js'
+import type { DraftAlert } from '../src/bot-options.js'
+
+function mkDraft(overrides: Partial<DraftAlert> = {}): DraftAlert {
+  return {
+    step: 'confirm',
+    name: 'Alerta test',
+    spot: 'sopelana',
+    waveSelected: ['1.0-1.5', '2.5-3.0'],
+    energySelected: ['low', 'high'],
+    periodSelected: ['8-10', '14-16'],
+    windSelected: ['NE', 'E'],
+    tidePortId: '72',
+    tidePreference: 'any',
+    flowMessageIds: [],
+    ...overrides,
+  }
+}
+
+test('draftToAlert usa envolvente min/max de todas las opciones seleccionadas', () => {
+  const alert = draftToAlert(123, mkDraft())
+  assert.ok(alert)
+  if (!alert) throw new Error('expected alert')
+
+  assert.equal(alert.waveMin, 1)
+  assert.equal(alert.waveMax, 3)
+  assert.equal(alert.periodMin, 8)
+  assert.equal(alert.periodMax, 16)
+  assert.equal(alert.energyMin, 0)
+  assert.equal(alert.energyMax, 4000)
+
+  assert.deepEqual(alert.waveRanges, [{ min: 1, max: 3 }])
+  assert.deepEqual(alert.periodRanges, [{ min: 8, max: 16 }])
+  assert.deepEqual(alert.windRanges, [{ min: 22.5, max: 112.5 }])
+})
+
+test('draftToAlert devuelve null si falta una selección requerida', () => {
+  const alert = draftToAlert(
+    123,
+    mkDraft({
+      energySelected: [],
+    }),
+  )
+
+  assert.equal(alert, null)
+})

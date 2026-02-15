@@ -128,6 +128,7 @@ bot.command('setalert', async (ctx) => {
     step: 'name',
     spot: DEFAULT_SPOT,
     waveSelected: [],
+    energySelected: [],
     periodSelected: [],
     windSelected: [],
     tidePortId: '72',
@@ -193,8 +194,8 @@ bot.on('callback_query:data', async (ctx) => {
       }
       d.step = 'energy'
       await ctx.answerCallbackQuery({ text: 'OK' })
-      await flowReply(ctx, d, 'Elige nivel de energía:', {
-        reply_markup: keyboardFromOptions('energy', ENERGY_OPTIONS, []),
+      await flowReply(ctx, d, 'Elige uno o varios rangos de energía:', {
+        reply_markup: keyboardFromOptions('energy', ENERGY_OPTIONS, d.energySelected),
       })
       return
     }
@@ -212,8 +213,8 @@ bot.on('callback_query:data', async (ctx) => {
 
   if (prefix === 'energy') {
     if (value === 'DONE') {
-      if (!d.energySelected) {
-        await ctx.answerCallbackQuery({ text: 'Elige un nivel de energía' })
+      if (!d.energySelected.length) {
+        await ctx.answerCallbackQuery({ text: 'Elige al menos un rango de energía' })
         return
       }
       d.step = 'period'
@@ -228,11 +229,13 @@ bot.on('callback_query:data', async (ctx) => {
       return
     }
 
-    d.energySelected = value
-    await ctx.answerCallbackQuery({ text: `Energía: ${value}` })
+    d.energySelected = toggle(d.energySelected, value)
+    await ctx.answerCallbackQuery({
+      text: `Energía: ${d.energySelected.join(', ') || 'ninguna'}`,
+    })
     await safeEditReplyMarkup(
       ctx,
-      keyboardFromOptions('energy', ENERGY_OPTIONS, [value]),
+      keyboardFromOptions('energy', ENERGY_OPTIONS, d.energySelected),
     )
     return
   }
