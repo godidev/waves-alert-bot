@@ -91,7 +91,6 @@ export function buildAlertProfileKey(alert: AlertRule): string {
     energyMax: alert.energyMax,
     tidePreference: alert.tidePreference,
     tidePortId: alert.tidePortId ?? '72',
-    minHours: alert.cooldownMin,
   })
 }
 

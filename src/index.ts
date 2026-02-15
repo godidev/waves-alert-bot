@@ -297,50 +297,6 @@ function tideTag(pref: AlertRule['tidePreference']): string {
   return 'any'
 }
 
-function tideClassByHeight(height: number, min: number, max: number): 'low' | 'mid' | 'high' {
-  const span = max - min
-  if (span <= 0) return 'mid'
-  const ratio = (height - min) / span
-  if (ratio < 1 / 3) return 'low'
-  if (ratio < 2 / 3) return 'mid'
-  return 'high'
-}
-
-function dateToEventDatePart(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-    date.getDate(),
-  ).padStart(2, '0')}`
-}
-
-function estimateTideHeightAt(target: Date, events: TideEvent[]): number | null {
-  const rows = events
-    .map((e) => ({
-      ...e,
-      at: new Date(`${e.date}T${e.hora}:00`),
-    }))
-    .filter((e) => !Number.isNaN(e.at.getTime()))
-    .sort((a, b) => a.at.getTime() - b.at.getTime())
-
-  if (!rows.length) return null
-
-  const t = target.getTime()
-  if (t <= rows[0].at.getTime()) return rows[0].altura
-  if (t >= rows[rows.length - 1].at.getTime()) return rows[rows.length - 1].altura
-
-  for (let i = 0; i < rows.length - 1; i++) {
-    const a = rows[i]
-    const b = rows[i + 1]
-    const ta = a.at.getTime()
-    const tb = b.at.getTime()
-    if (t >= ta && t <= tb) {
-      const k = (t - ta) / (tb - ta)
-      return a.altura + (b.altura - a.altura) * k
-    }
-  }
-
-  return null
-}
-
 async function getTideEventsForDate(portId: string, yyyymmdd: string): Promise<TideEvent[]> {
   const cacheKey = `${portId}:${yyyymmdd}`
   const cached = tideDayCache.get(cacheKey)
@@ -401,7 +357,6 @@ function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
     periodMax: periodEnv.max,
     windRanges: windRanges.length ? windRanges : undefined,
     windLabels: d.windSelected.length ? d.windSelected : undefined,
-    cooldownMin: 180,
     tidePortId: d.tidePortId ?? '72',
     tidePortName: TIDE_PORT_OPTIONS.find((p) => p.id === (d.tidePortId ?? '72'))?.label ?? 'Bermeo',
     tidePreference: d.tidePreference ?? 'any',
@@ -413,12 +368,6 @@ function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
     periodLabels: [...d.periodSelected],
     energyLabel: energyOpt.label,
   } as AlertRule
-}
-
-function cooldownOk(alert: AlertRule): boolean {
-  if (!alert.lastNotifiedAt) return true
-  const last = new Date(alert.lastNotifiedAt).getTime()
-  return Date.now() - last >= alert.cooldownMin * 60_000
 }
 
 async function fetchForecasts(spot: string): Promise<SurfForecast[]> {
