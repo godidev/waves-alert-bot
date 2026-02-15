@@ -13,7 +13,7 @@ import { degreesToCardinal, nextId, primaryPeriod, totalWaveHeight } from './uti
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.app'
 const CHECK_INTERVAL_MIN = Number(process.env.CHECK_INTERVAL_MIN ?? 30)
-const DEFAULT_SPOT = 'sopela'
+const DEFAULT_SPOT = 'sopelana'
 
 type Step = 'name' | 'wave' | 'energy' | 'period' | 'wind' | 'tidePort' | 'tidePref' | 'confirm'
 

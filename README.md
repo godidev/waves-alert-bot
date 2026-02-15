@@ -40,7 +40,7 @@ pm2 save
 ```
 
 ## Notas
-- Spot fijo por ahora: `sopela`.
+- Spot fijo por ahora: `sopelana`.
 - El bot revisa condiciones cada `CHECK_INTERVAL_MIN` (default 30).
 - Guarda alertas en `data/alerts.json`.
 - El bot convierte selecciones múltiples en rangos internos para evaluar alertas.
