@@ -37,10 +37,30 @@ function migrateAlert(rawAlert: any): AlertRule {
   return alert as AlertRule
 }
 
+function resetCorruptedDb(raw: string): DbShape {
+  const backupPath = `${DB_PATH}.corrupted-${Date.now()}.bak`
+  try {
+    writeFileSync(backupPath, raw)
+  } catch {
+    // noop
+  }
+
+  const empty: DbShape = { alerts: [] }
+  writeFileSync(DB_PATH, JSON.stringify(empty, null, 2))
+  return empty
+}
+
 function readDb(): DbShape {
   ensureDb()
+
   const raw = readFileSync(DB_PATH, 'utf8')
-  const parsed = JSON.parse(raw) as DbShape
+  let parsed: DbShape
+
+  try {
+    parsed = JSON.parse(raw) as DbShape
+  } catch {
+    return resetCorruptedDb(raw)
+  }
 
   const migratedAlerts = (parsed.alerts ?? []).map(migrateAlert)
   const changed = JSON.stringify(migratedAlerts) !== JSON.stringify(parsed.alerts ?? [])
