@@ -9,14 +9,8 @@ import {
 } from './storage.js'
 import type { AlertRule, SurfForecast, WindRange } from './types.js'
 import { nextId } from './utils.js'
-import {
-  buildAlertMessage,
-  findNearestTides,
-  firstConsecutiveWindow,
-  matches,
-  type CandidateMatch,
-  type TideEvent,
-} from './alert-engine.js'
+import type { TideEvent } from './alert-engine.js'
+import { runChecksWithDeps } from './check-runner.js'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.app'
@@ -433,74 +427,16 @@ async function fetchForecasts(spot: string): Promise<SurfForecast[]> {
 }
 
 async function runChecks(): Promise<void> {
-  for (const alert of listAllAlerts()) {
-    try {
-      const forecasts = await fetchForecasts(alert.spot)
-      if (!forecasts.length || !cooldownOk(alert)) continue
-
-      const matchesFound = forecasts.filter((f) => matches(alert, f))
-      if (!matchesFound.length) continue
-
-      const candidateMatches: CandidateMatch[] = []
-
-      for (const candidate of matchesFound) {
-        const targetDate = new Date(candidate.date)
-        if (Number.isNaN(targetDate.getTime())) continue
-
-        const inLightWindow = await isWithinAlertWindow(alert.spot, targetDate)
-        if (!inLightWindow) continue
-
-        const tidePortId = alert.tidePortId ?? '72'
-        const yyyymmdd = apiDateFromForecastDate(candidate.date)
-        const tideEvents = await getTideEventsForDate(tidePortId, yyyymmdd)
-
-        let tideClass: 'low' | 'mid' | 'high' | null = null
-        let tideHeight: number | null = null
-
-        if (tideEvents.length) {
-          const estimated = estimateTideHeightAt(targetDate, tideEvents)
-          if (estimated != null) {
-            const min = Math.min(...tideEvents.map((e) => e.altura))
-            const max = Math.max(...tideEvents.map((e) => e.altura))
-            tideClass = tideClassByHeight(estimated, min, max)
-            tideHeight = estimated
-          }
-        }
-
-        if (alert.tidePreference && alert.tidePreference !== 'any') {
-          if (!tideClass) continue
-          if (tideClass !== alert.tidePreference) continue
-        }
-
-        candidateMatches.push({ forecast: candidate, tideClass, tideHeight })
-      }
-
-      const window = firstConsecutiveWindow(candidateMatches, Math.max(1, MIN_CONSECUTIVE_HOURS))
-      if (!window) continue
-
-      const first = window.start.forecast
-      const startDate = new Date(window.start.forecast.date)
-      const endDate = new Date(window.end.forecast.date)
-
-      const tidePortId = alert.tidePortId ?? '72'
-      const tideDate = apiDateFromForecastDate(window.start.forecast.date)
-      const tideEvents = await getTideEventsForDate(tidePortId, tideDate)
-      const nearestTides = findNearestTides(startDate, tideEvents)
-
-      const message = buildAlertMessage({
-        alert,
-        first,
-        startDate,
-        endDate,
-        nearestTides,
-      })
-
-      await bot.api.sendMessage(alert.chatId, message)
-      touchAlertNotified(alert.id, new Date().toISOString())
-    } catch {
-      // noop
-    }
-  }
+  await runChecksWithDeps({
+    alerts: listAllAlerts(),
+    minConsecutiveHours: MIN_CONSECUTIVE_HOURS,
+    fetchForecasts,
+    isWithinAlertWindow,
+    getTideEventsForDate,
+    apiDateFromForecastDate,
+    sendMessage: (chatId, message) => bot.api.sendMessage(chatId, message).then(() => undefined),
+    touchAlertNotified,
+  })
 }
 
 const COMMANDS_HELP =
