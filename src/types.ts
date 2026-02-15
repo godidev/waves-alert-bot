@@ -22,6 +22,9 @@ export interface AlertRule {
   windLabels?: string[]
   energyLabel?: string
   cooldownMin: number
+  tidePortId?: string
+  tidePortName?: string
+  tidePreference?: 'low' | 'mid' | 'high' | 'any'
   lastNotifiedAt?: string
   createdAt: string
 }

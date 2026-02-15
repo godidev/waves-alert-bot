@@ -15,7 +15,7 @@ const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.
 const CHECK_INTERVAL_MIN = Number(process.env.CHECK_INTERVAL_MIN ?? 30)
 const DEFAULT_SPOT = 'sopela'
 
-type Step = 'name' | 'wave' | 'energy' | 'period' | 'wind' | 'confirm'
+type Step = 'name' | 'wave' | 'energy' | 'period' | 'wind' | 'tidePort' | 'tidePref' | 'confirm'
 
 type RangeOption = { id: string; label: string; min: number; max: number }
 
@@ -45,6 +45,18 @@ const ENERGY_OPTIONS: RangeOption[] = [
   { id: 'very-high', label: 'Muy alta (4000+)', min: 4000, max: 999999 },
 ]
 
+const TIDE_PORT_OPTIONS = [
+  { id: '72', label: 'Bermeo' },
+  { id: '2', label: 'Bilbao' },
+] as const
+
+const TIDE_PREF_OPTIONS = [
+  { id: 'any', label: 'ANY (sin filtro)' },
+  { id: 'low', label: 'Baja' },
+  { id: 'mid', label: 'Media' },
+  { id: 'high', label: 'Alta' },
+] as const
+
 interface DraftAlert {
   step: Step
   name?: string
@@ -53,6 +65,8 @@ interface DraftAlert {
   periodSelected: string[]
   energySelected?: string
   windSelected: string[]
+  tidePortId?: string
+  tidePreference?: 'low' | 'mid' | 'high' | 'any'
   pendingAlert?: AlertRule
 }
 
@@ -140,6 +154,23 @@ function windKeyboard(selected: string[]): InlineKeyboard {
     .text('✅ Confirmar', 'wind:DONE')
 }
 
+function tidePortKeyboard(selected?: string): InlineKeyboard {
+  const kb = new InlineKeyboard()
+  TIDE_PORT_OPTIONS.forEach((p) => {
+    kb.text(`${selected === p.id ? '✅ ' : ''}${p.label}`, `tideport:${p.id}`).row()
+  })
+  kb.text('✅ Confirmar', 'tideport:DONE')
+  return kb
+}
+
+function tidePreferenceKeyboard(selected?: 'low' | 'mid' | 'high' | 'any'): InlineKeyboard {
+  const kb = new InlineKeyboard()
+  TIDE_PREF_OPTIONS.forEach((p) => {
+    kb.text(`${selected === p.id ? '✅ ' : ''}${p.label}`, `tidepref:${p.id}`).row()
+  })
+  return kb
+}
+
 function toRanges(selected: string[], options: RangeOption[]): WindRange[] {
   return selected
     .map((id) => options.find((o) => o.id === id))
@@ -168,8 +199,111 @@ function alertSummaryText(a: AlertRule): string {
     `• Energía: ${a.energyLabel ?? `${a.energyMin}-${a.energyMax}`}`,
     `• Periodo: ${a.periodLabels?.join(', ') ?? `${a.periodMin}-${a.periodMax}s`}`,
     `• Viento: ${a.windLabels?.join(', ') ?? 'ANY'}`,
+    `• Marea: ${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`,
     `• Cooldown: ${a.cooldownMin} min`,
   ].join('\n')
+}
+
+type TideEvent = {
+  date: string
+  hora: string
+  altura: number
+  tipo: 'pleamar' | 'bajamar' | string
+}
+
+const tideDayCache = new Map<string, TideEvent[]>()
+
+function yyyymmddFromDate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}${m}${d}`
+}
+
+function apiDateFromForecastDate(dateRaw: string): string {
+  const m = dateRaw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (m) return `${m[1]}${m[2]}${m[3]}`
+  return yyyymmddFromDate(new Date(dateRaw))
+}
+
+function tideTag(pref: AlertRule['tidePreference']): string {
+  if (pref === 'low') return 'baja'
+  if (pref === 'mid') return 'media'
+  if (pref === 'high') return 'alta'
+  return 'any'
+}
+
+function tideClassByHeight(height: number, min: number, max: number): 'low' | 'mid' | 'high' {
+  const span = max - min
+  if (span <= 0) return 'mid'
+  const ratio = (height - min) / span
+  if (ratio < 1 / 3) return 'low'
+  if (ratio < 2 / 3) return 'mid'
+  return 'high'
+}
+
+function dateToEventDatePart(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate(),
+  ).padStart(2, '0')}`
+}
+
+function estimateTideHeightAt(target: Date, events: TideEvent[]): number | null {
+  const rows = events
+    .map((e) => ({
+      ...e,
+      at: new Date(`${e.date}T${e.hora}:00`),
+    }))
+    .filter((e) => !Number.isNaN(e.at.getTime()))
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+
+  if (!rows.length) return null
+
+  const t = target.getTime()
+  if (t <= rows[0].at.getTime()) return rows[0].altura
+  if (t >= rows[rows.length - 1].at.getTime()) return rows[rows.length - 1].altura
+
+  for (let i = 0; i < rows.length - 1; i++) {
+    const a = rows[i]
+    const b = rows[i + 1]
+    const ta = a.at.getTime()
+    const tb = b.at.getTime()
+    if (t >= ta && t <= tb) {
+      const k = (t - ta) / (tb - ta)
+      return a.altura + (b.altura - a.altura) * k
+    }
+  }
+
+  return null
+}
+
+async function getTideEventsForDate(portId: string, yyyymmdd: string): Promise<TideEvent[]> {
+  const cacheKey = `${portId}:${yyyymmdd}`
+  const cached = tideDayCache.get(cacheKey)
+  if (cached) return cached
+
+  const url = `https://ideihm.covam.es/api-ihm/getmarea?request=gettide&id=${encodeURIComponent(
+    portId,
+  )}&format=json&date=${yyyymmdd}`
+  const res = await fetch(url)
+  if (!res.ok) return []
+  const json = (await res.json()) as {
+    mareas?: { fecha?: string; datos?: { marea?: { hora: string; altura: string; tipo?: string }[] } }
+  }
+
+  const datePart = json.mareas?.fecha
+    ? json.mareas.fecha
+    : `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`
+
+  const out: TideEvent[] = (json.mareas?.datos?.marea ?? []).map((m) => ({
+    date: datePart,
+    hora: m.hora,
+    altura: Number(m.altura),
+    tipo: m.tipo ?? '',
+  }))
+
+  tideDayCache.set(cacheKey, out)
+  return out
 }
 
 function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
@@ -204,6 +338,9 @@ function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
     windRanges: windRanges.length ? windRanges : undefined,
     windLabels: d.windSelected.length ? d.windSelected : undefined,
     cooldownMin: 180,
+    tidePortId: d.tidePortId ?? '72',
+    tidePortName: TIDE_PORT_OPTIONS.find((p) => p.id === (d.tidePortId ?? '72'))?.label ?? 'Bermeo',
+    tidePreference: d.tidePreference ?? 'any',
     lastNotifiedAt: undefined,
     createdAt: new Date().toISOString(),
     waveRanges,
@@ -256,7 +393,39 @@ async function runChecks(): Promise<void> {
       const matchesFound = forecasts.filter((f) => matches(alert, f))
       if (!matchesFound.length) continue
 
-      const first = matchesFound[0]
+      let first: SurfForecast | null = null
+      let firstTideClass: 'low' | 'mid' | 'high' | null = null
+      let firstTideHeight: number | null = null
+
+      for (const candidate of matchesFound) {
+        if (!alert.tidePreference || alert.tidePreference === 'any') {
+          first = candidate
+          break
+        }
+
+        const tidePortId = alert.tidePortId ?? '72'
+        const yyyymmdd = apiDateFromForecastDate(candidate.date)
+        const tideEvents = await getTideEventsForDate(tidePortId, yyyymmdd)
+        if (!tideEvents.length) continue
+
+        const targetDate = new Date(candidate.date)
+        const tideHeight = estimateTideHeightAt(targetDate, tideEvents)
+        if (tideHeight == null) continue
+
+        const min = Math.min(...tideEvents.map((e) => e.altura))
+        const max = Math.max(...tideEvents.map((e) => e.altura))
+        const tideClass = tideClassByHeight(tideHeight, min, max)
+
+        if (tideClass === alert.tidePreference) {
+          first = candidate
+          firstTideClass = tideClass
+          firstTideHeight = tideHeight
+          break
+        }
+      }
+
+      if (!first) continue
+
       const firstDate = new Date(first.date)
       const dateText = Number.isNaN(firstDate.getTime())
         ? first.date
@@ -267,9 +436,16 @@ async function runChecks(): Promise<void> {
             minute: '2-digit',
           })
 
+      const tideText =
+        alert.tidePreference && alert.tidePreference !== 'any'
+          ? `\nMarea: ${tideTag(firstTideClass ?? alert.tidePreference)}${
+              firstTideHeight != null ? ` (${firstTideHeight.toFixed(2)}m)` : ''
+            } · Ref: ${alert.tidePortName ?? 'Bermeo'}`
+          : ''
+
       await bot.api.sendMessage(
         alert.chatId,
-        `🌊 ALERTA: ${alert.name}\nSpot: ${alert.spot}\nCoincidencias próximas horas: ${matchesFound.length}\nPrimera: ${dateText}\nOla: ${totalWaveHeight(first).toFixed(2)}m\nPeriodo: ${primaryPeriod(first).toFixed(1)}s\nEnergía: ${first.energy.toFixed(0)}\nViento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)`,
+        `🌊 ALERTA: ${alert.name}\nSpot: ${alert.spot}\nCoincidencias próximas horas: ${matchesFound.length}\nPrimera: ${dateText}\nOla: ${totalWaveHeight(first).toFixed(2)}m\nPeriodo: ${primaryPeriod(first).toFixed(1)}s\nEnergía: ${first.energy.toFixed(0)}\nViento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)${tideText}`,
       )
       touchAlertNotified(alert.id, new Date().toISOString())
     } catch {
@@ -296,6 +472,8 @@ bot.command('setalert', async (ctx) => {
     waveSelected: [],
     periodSelected: [],
     windSelected: [],
+    tidePortId: '72',
+    tidePreference: 'any',
   })
 
   await ctx.reply('Pon un nombre para la alerta:')
@@ -413,30 +591,20 @@ bot.on('callback_query:data', async (ctx) => {
   if (prefix === 'wind') {
     if (value === 'ANY') {
       d.windSelected = []
-      const final = draftToAlert(chatId, d)
-      if (!final) {
-        await ctx.answerCallbackQuery({ text: 'Faltan datos' })
-        return
-      }
-
-      d.step = 'confirm'
-      d.pendingAlert = final
-      await ctx.answerCallbackQuery({ text: 'Revisa y confirma' })
-      await ctx.reply(alertSummaryText(final), { reply_markup: confirmKeyboard() })
+      d.step = 'tidePort'
+      await ctx.answerCallbackQuery({ text: 'OK' })
+      await ctx.reply('Elige puerto de marea de referencia:', {
+        reply_markup: tidePortKeyboard(d.tidePortId),
+      })
       return
     }
 
     if (value === 'DONE') {
-      const final = draftToAlert(chatId, d)
-      if (!final) {
-        await ctx.answerCallbackQuery({ text: 'Faltan datos' })
-        return
-      }
-
-      d.step = 'confirm'
-      d.pendingAlert = final
-      await ctx.answerCallbackQuery({ text: 'Revisa y confirma' })
-      await ctx.reply(alertSummaryText(final), { reply_markup: confirmKeyboard() })
+      d.step = 'tidePort'
+      await ctx.answerCallbackQuery({ text: 'OK' })
+      await ctx.reply('Elige puerto de marea de referencia:', {
+        reply_markup: tidePortKeyboard(d.tidePortId),
+      })
       return
     }
 
@@ -448,6 +616,51 @@ bot.on('callback_query:data', async (ctx) => {
     d.windSelected = toggle(d.windSelected, value)
     await ctx.answerCallbackQuery({ text: `Viento: ${d.windSelected.join(', ') || 'ANY'}` })
     await ctx.editMessageReplyMarkup({ reply_markup: windKeyboard(d.windSelected) })
+    return
+  }
+
+  if (prefix === 'tideport') {
+    if (value === 'DONE') {
+      if (!d.tidePortId) {
+        await ctx.answerCallbackQuery({ text: 'Elige un puerto' })
+        return
+      }
+      d.step = 'tidePref'
+      await ctx.answerCallbackQuery({ text: 'OK' })
+      await ctx.reply('Elige marea ideal:', {
+        reply_markup: tidePreferenceKeyboard(d.tidePreference),
+      })
+      return
+    }
+
+    if (!TIDE_PORT_OPTIONS.find((p) => p.id === value)) {
+      await ctx.answerCallbackQuery({ text: 'Puerto inválido' })
+      return
+    }
+
+    d.tidePortId = value
+    await ctx.answerCallbackQuery({ text: `Puerto: ${TIDE_PORT_OPTIONS.find((p) => p.id === value)?.label}` })
+    await ctx.editMessageReplyMarkup({ reply_markup: tidePortKeyboard(d.tidePortId) })
+    return
+  }
+
+  if (prefix === 'tidepref') {
+    if (!TIDE_PREF_OPTIONS.find((p) => p.id === value)) {
+      await ctx.answerCallbackQuery({ text: 'Opción inválida' })
+      return
+    }
+
+    d.tidePreference = value as 'low' | 'mid' | 'high' | 'any'
+    const final = draftToAlert(chatId, d)
+    if (!final) {
+      await ctx.answerCallbackQuery({ text: 'Faltan datos' })
+      return
+    }
+
+    d.step = 'confirm'
+    d.pendingAlert = final
+    await ctx.answerCallbackQuery({ text: 'Revisa y confirma' })
+    await ctx.reply(alertSummaryText(final), { reply_markup: confirmKeyboard() })
     return
   }
 
@@ -486,6 +699,7 @@ bot.command('listalerts', async (ctx) => {
     const energy = a.energyLabel ?? `${a.energyMin}-${a.energyMax}`
     const period = a.periodLabels?.join(', ') ?? `${a.periodMin}-${a.periodMax}s`
     const wind = a.windLabels?.join(', ') ?? 'ANY'
+    const tide = `${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`
 
     return [
       `#${idx + 1} · ${a.name}`,
@@ -495,6 +709,7 @@ bot.command('listalerts', async (ctx) => {
       `Energía: ${energy}`,
       `Periodo: ${period}`,
       `Viento: ${wind}`,
+      `Marea: ${tide}`,
       `Cooldown: ${a.cooldownMin} min`,
     ].join('\n')
   })
