@@ -586,15 +586,15 @@ async function runChecks(): Promise<void> {
       const diffHours = Math.round((startDate.getTime() - Date.now()) / (60 * 60 * 1000))
       const withinText = diffHours <= 0 ? 'en curso' : `dentro de ${diffHours}h`
 
-      const tideText = `\nMarea: ${
+      const tideText = `\n🌙 Marea: ${
         firstTideClass ? tideTag(firstTideClass) : 'n/d'
-      }${firstTideHeight != null ? ` (${firstTideHeight.toFixed(2)}m)` : ''} · Ref: ${
+      }${firstTideHeight != null ? ` (${firstTideHeight.toFixed(2)}m)` : ''} · 📍 ${
         alert.tidePortName ?? 'Bermeo'
       }`
 
       await bot.api.sendMessage(
         alert.chatId,
-        `🌊 ALERTA: ${alert.name}\nSpot: ${alert.spot}\nCoincidencia: ${dayText} / ${startHour} - ${endHour} / ${withinText}\nSwell: ${totalWaveHeight(first).toFixed(2)}m @${primaryPeriod(first).toFixed(1)}s\n⚡ Energía: ${first.energy.toFixed(0)}\nViento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)${tideText}`,
+        `🚨🌊 ALERTA: ${alert.name}\n📍 Spot: ${alert.spot}\n🗓️ Coincidencia: ${dayText} / ${startHour} - ${endHour} / ${withinText}\n🏄 Swell: ${totalWaveHeight(first).toFixed(2)}m @${primaryPeriod(first).toFixed(1)}s\n⚡ Energía: ${first.energy.toFixed(0)}\n💨 Viento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)${tideText}`,
       )
       touchAlertNotified(alert.id, new Date().toISOString())
     } catch {
