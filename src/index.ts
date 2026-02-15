@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { Bot, InlineKeyboard } from 'grammy'
+import { Bot, GrammyError, InlineKeyboard } from 'grammy'
 import {
   deleteAlert,
   insertAlert,
@@ -76,6 +76,21 @@ const drafts = new Map<number, DraftAlert>()
 if (!BOT_TOKEN) throw new Error('Missing TELEGRAM_BOT_TOKEN')
 
 const bot = new Bot(BOT_TOKEN)
+
+bot.catch((err) => {
+  console.error('bot_error', err.error)
+})
+
+async function safeEditReplyMarkup(ctx: any, replyMarkup: InlineKeyboard): Promise<void> {
+  try {
+    await ctx.editMessageReplyMarkup({ reply_markup: replyMarkup })
+  } catch (err) {
+    if (err instanceof GrammyError && err.description?.includes('message is not modified')) {
+      return
+    }
+    throw err
+  }
+}
 
 function normalizeAngle(deg: number): number {
   return ((deg % 360) + 360) % 360
@@ -648,9 +663,7 @@ bot.on('callback_query:data', async (ctx) => {
     await ctx.answerCallbackQuery({
       text: `Alturas: ${d.waveSelected.join(', ') || 'ninguna'}`,
     })
-    await ctx.editMessageReplyMarkup({
-      reply_markup: keyboardFromOptions('wave', WAVE_OPTIONS, d.waveSelected),
-    })
+    await safeEditReplyMarkup(ctx, keyboardFromOptions('wave', WAVE_OPTIONS, d.waveSelected))
     return
   }
 
@@ -670,9 +683,7 @@ bot.on('callback_query:data', async (ctx) => {
 
     d.energySelected = value
     await ctx.answerCallbackQuery({ text: `Energía: ${value}` })
-    await ctx.editMessageReplyMarkup({
-      reply_markup: keyboardFromOptions('energy', ENERGY_OPTIONS, [value]),
-    })
+    await safeEditReplyMarkup(ctx, keyboardFromOptions('energy', ENERGY_OPTIONS, [value]))
     return
   }
 
@@ -694,9 +705,7 @@ bot.on('callback_query:data', async (ctx) => {
     await ctx.answerCallbackQuery({
       text: `Periodos: ${d.periodSelected.join(', ') || 'ninguno'}`,
     })
-    await ctx.editMessageReplyMarkup({
-      reply_markup: keyboardFromOptions('period', PERIOD_OPTIONS, d.periodSelected),
-    })
+    await safeEditReplyMarkup(ctx, keyboardFromOptions('period', PERIOD_OPTIONS, d.periodSelected))
     return
   }
 
@@ -727,7 +736,7 @@ bot.on('callback_query:data', async (ctx) => {
 
     d.windSelected = toggle(d.windSelected, value)
     await ctx.answerCallbackQuery({ text: `Viento: ${d.windSelected.join(', ') || 'ANY'}` })
-    await ctx.editMessageReplyMarkup({ reply_markup: windKeyboard(d.windSelected) })
+    await safeEditReplyMarkup(ctx, windKeyboard(d.windSelected))
     return
   }
 
@@ -752,7 +761,7 @@ bot.on('callback_query:data', async (ctx) => {
 
     d.tidePortId = value
     await ctx.answerCallbackQuery({ text: `Puerto: ${TIDE_PORT_OPTIONS.find((p) => p.id === value)?.label}` })
-    await ctx.editMessageReplyMarkup({ reply_markup: tidePortKeyboard(d.tidePortId) })
+    await safeEditReplyMarkup(ctx, tidePortKeyboard(d.tidePortId))
     return
   }
 
