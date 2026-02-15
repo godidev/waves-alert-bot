@@ -27,11 +27,6 @@ export interface CheckRunnerDeps {
   nowMs?: () => number
 }
 
-function cooldownOk(alert: AlertRule, nowMs: number): boolean {
-  if (!alert.lastNotifiedAt) return true
-  const last = new Date(alert.lastNotifiedAt).getTime()
-  return nowMs - last >= alert.cooldownMin * 60_000
-}
 
 function tideClassByHeight(height: number, min: number, max: number): 'low' | 'mid' | 'high' {
   const span = max - min
@@ -170,7 +165,7 @@ export async function runChecksWithDeps(deps: CheckRunnerDeps): Promise<void> {
   for (const alert of deps.alerts) {
     try {
       const forecasts = await deps.fetchForecasts(alert.spot)
-      if (!forecasts.length || !cooldownOk(alert, now())) continue
+      if (!forecasts.length) continue
 
       const matchesFound = forecasts.filter((f) => matches(alert, f))
       if (!matchesFound.length) continue

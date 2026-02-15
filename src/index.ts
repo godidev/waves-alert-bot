@@ -208,7 +208,6 @@ function alertSummaryText(a: AlertRule): string {
     `• Periodo: ${a.periodLabels?.join(', ') ?? `${a.periodMin}-${a.periodMax}s`}`,
     `• Viento: ${a.windLabels?.join(', ') ?? 'ANY'}`,
     `• Marea: ${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`,
-    `• Cooldown: ${a.cooldownMin} min`,
   ].join('\n')
 }
 
@@ -721,7 +720,6 @@ bot.command('listalerts', async (ctx) => {
       `Periodo: ${period}`,
       `Viento: ${wind}`,
       `Marea: ${tide}`,
-      `Cooldown: ${a.cooldownMin} min`,
     ].join('\n')
   })
 
