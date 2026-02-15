@@ -19,6 +19,7 @@ Guía operativa rápida para trabajar en este repo.
 ## Commits (obligatorio)
 - **Cada cambio realizado debe tener su propio commit**.
 - **Todos los mensajes de commit deben estar en inglés**.
+- **Los commits deben ser de tipo conventional commit**.
 - Evitar commits “mezcla” con cambios no relacionados.
 
 ## Checklist mínimo antes de cerrar un cambio
