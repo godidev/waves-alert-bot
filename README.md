@@ -23,6 +23,22 @@ npm run dev
 3. Periodo (selección múltiple por rangos desde 8s)
 4. Viento (8 opciones: N/NE/E/SE/S/SW/W/NW, selección múltiple)
 
+## PM2 (producción)
+```bash
+# arrancar con ecosystem
+pm2 start ecosystem.config.cjs
+
+# ver estado/logs
+pm2 status waves-alerts-bot
+pm2 logs waves-alerts-bot
+
+# aplicar cambios de config
+pm2 restart ecosystem.config.cjs --only waves-alerts-bot
+
+# persistir procesos
+pm2 save
+```
+
 ## Notas
 - Spot fijo por ahora: `sopela`.
 - El bot revisa condiciones cada `CHECK_INTERVAL_MIN` (default 30).
