@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runChecksWithDeps } from './check-runner.js'
+import { runChecksWithDeps, shouldSendWindow } from './check-runner.js'
 import type { AlertRule, SurfForecast } from './types.js'
 import type { TideEvent } from './alert-engine.js'
 
@@ -45,6 +45,46 @@ function mkTides(day = '2026-02-16'): TideEvent[] {
     { date: day, hora: '19:10', altura: 0.7, tipo: 'bajamar' },
   ]
 }
+
+test('dedupe: no envía si ventana igual', () => {
+  assert.equal(
+    shouldSendWindow(
+      { startMs: 1000, endMs: 4000 },
+      { startMs: 1000, endMs: 4000 },
+    ),
+    false,
+  )
+})
+
+test('dedupe: no envía si ventana contenida', () => {
+  assert.equal(
+    shouldSendWindow(
+      { startMs: 1000, endMs: 5000 },
+      { startMs: 2000, endMs: 4000 },
+    ),
+    false,
+  )
+})
+
+test('dedupe: envía si amplía por detrás', () => {
+  assert.equal(
+    shouldSendWindow(
+      { startMs: 1000, endMs: 5000 },
+      { startMs: 1000, endMs: 7000 },
+    ),
+    true,
+  )
+})
+
+test('dedupe: envía si ventana desplazada', () => {
+  assert.equal(
+    shouldSendWindow(
+      { startMs: 1000, endMs: 5000 },
+      { startMs: 6000, endMs: 9000 },
+    ),
+    true,
+  )
+})
 
 test('runChecksWithDeps envía mensaje cuando hay ventana consecutiva válida', async () => {
   const sent: string[] = []
@@ -95,13 +135,13 @@ test('runChecksWithDeps no envía si no se cumple consecutividad mínima', async
   assert.equal(sent, 0)
 })
 
-test('runChecksWithDeps filtra por tidePreference', async () => {
+test('runChecksWithDeps marea alta: filtra fuera de ventana ±3h de pleamar', async () => {
   let sent = 0
 
   await runChecksWithDeps({
     alerts: [mkAlert({ tidePreference: 'high' })],
     minConsecutiveHours: 1,
-    fetchForecasts: async () => [mkForecast('2026-02-16T07:00:00.000Z')],
+    fetchForecasts: async () => [mkForecast('2026-02-16T18:00:00.000Z')],
     isWithinAlertWindow: async () => true,
     getTideEventsForDate: async () => mkTides(),
     apiDateFromForecastDate: () => '20260216',
@@ -111,5 +151,6 @@ test('runChecksWithDeps filtra por tidePreference', async () => {
     touchAlertNotified: () => undefined,
   })
 
+  // Pleamar 12:30 -> ventana válida 09:30..15:30, por tanto 18:00 no entra.
   assert.equal(sent, 0)
 })
