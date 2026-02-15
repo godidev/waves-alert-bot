@@ -212,6 +212,12 @@ type TideEvent = {
 }
 
 const tideDayCache = new Map<string, TideEvent[]>()
+const sunsetCache = new Map<string, Date>()
+
+const SPOT_COORDS: Record<string, { lat: number; lng: number }> = {
+  sopelana: { lat: 43.3798, lng: -2.9808 },
+  sopela: { lat: 43.3798, lng: -2.9808 },
+}
 
 function yyyymmddFromDate(date: Date): string {
   const y = date.getFullYear()
@@ -224,6 +230,64 @@ function apiDateFromForecastDate(dateRaw: string): string {
   const m = dateRaw.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (m) return `${m[1]}${m[2]}${m[3]}`
   return yyyymmddFromDate(new Date(dateRaw))
+}
+
+function localYmdInMadrid(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Madrid',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+
+  const y = parts.find((p) => p.type === 'year')?.value ?? '1970'
+  const m = parts.find((p) => p.type === 'month')?.value ?? '01'
+  const d = parts.find((p) => p.type === 'day')?.value ?? '01'
+  return `${y}-${m}-${d}`
+}
+
+function localHourInMadrid(date: Date): number {
+  const hour = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Madrid',
+    hour: '2-digit',
+    hour12: false,
+  }).format(date)
+  return Number(hour)
+}
+
+async function getSunsetDate(spot: string, date: Date): Promise<Date | null> {
+  const coords = SPOT_COORDS[spot]
+  if (!coords) return null
+
+  const day = localYmdInMadrid(date)
+  const cacheKey = `${spot}:${day}`
+  const cached = sunsetCache.get(cacheKey)
+  if (cached) return cached
+
+  const url = `https://api.sunrise-sunset.org/json?lat=${coords.lat}&lng=${coords.lng}&date=${day}&formatted=0`
+  const res = await fetch(url)
+  if (!res.ok) return null
+
+  const json = (await res.json()) as { results?: { sunset?: string } }
+  const rawSunset = json.results?.sunset
+  if (!rawSunset) return null
+
+  const sunset = new Date(rawSunset)
+  if (Number.isNaN(sunset.getTime())) return null
+
+  sunsetCache.set(cacheKey, sunset)
+  return sunset
+}
+
+async function isWithinAlertWindow(spot: string, forecastDate: Date): Promise<boolean> {
+  const localHour = localHourInMadrid(forecastDate)
+  if (localHour < 5) return false
+
+  const sunset = await getSunsetDate(spot, forecastDate)
+  if (!sunset) return true
+
+  const sunsetPlusOneHour = new Date(sunset.getTime() + 60 * 60 * 1000)
+  return forecastDate.getTime() <= sunsetPlusOneHour.getTime()
 }
 
 function tideTag(pref: AlertRule['tidePreference']): string {
@@ -398,30 +462,41 @@ async function runChecks(): Promise<void> {
       let firstTideHeight: number | null = null
 
       for (const candidate of matchesFound) {
-        if (!alert.tidePreference || alert.tidePreference === 'any') {
-          first = candidate
-          break
-        }
+        const targetDate = new Date(candidate.date)
+        if (Number.isNaN(targetDate.getTime())) continue
+
+        const inLightWindow = await isWithinAlertWindow(alert.spot, targetDate)
+        if (!inLightWindow) continue
 
         const tidePortId = alert.tidePortId ?? '72'
         const yyyymmdd = apiDateFromForecastDate(candidate.date)
         const tideEvents = await getTideEventsForDate(tidePortId, yyyymmdd)
-        if (!tideEvents.length) continue
 
-        const targetDate = new Date(candidate.date)
-        const tideHeight = estimateTideHeightAt(targetDate, tideEvents)
-        if (tideHeight == null) continue
-
-        const min = Math.min(...tideEvents.map((e) => e.altura))
-        const max = Math.max(...tideEvents.map((e) => e.altura))
-        const tideClass = tideClassByHeight(tideHeight, min, max)
-
-        if (tideClass === alert.tidePreference) {
-          first = candidate
-          firstTideClass = tideClass
-          firstTideHeight = tideHeight
-          break
+        if (tideEvents.length) {
+          const tideHeight = estimateTideHeightAt(targetDate, tideEvents)
+          if (tideHeight != null) {
+            const min = Math.min(...tideEvents.map((e) => e.altura))
+            const max = Math.max(...tideEvents.map((e) => e.altura))
+            firstTideClass = tideClassByHeight(tideHeight, min, max)
+            firstTideHeight = tideHeight
+          }
         }
+
+        if (
+          alert.tidePreference &&
+          alert.tidePreference !== 'any' &&
+          firstTideClass &&
+          firstTideClass !== alert.tidePreference
+        ) {
+          continue
+        }
+
+        if (alert.tidePreference && alert.tidePreference !== 'any' && !firstTideClass) {
+          continue
+        }
+
+        first = candidate
+        break
       }
 
       if (!first) continue
@@ -436,12 +511,11 @@ async function runChecks(): Promise<void> {
             minute: '2-digit',
           })
 
-      const tideText =
-        alert.tidePreference && alert.tidePreference !== 'any'
-          ? `\nMarea: ${tideTag(firstTideClass ?? alert.tidePreference)}${
-              firstTideHeight != null ? ` (${firstTideHeight.toFixed(2)}m)` : ''
-            } · Ref: ${alert.tidePortName ?? 'Bermeo'}`
-          : ''
+      const tideText = `\nMarea: ${
+        firstTideClass ? tideTag(firstTideClass) : 'n/d'
+      }${firstTideHeight != null ? ` (${firstTideHeight.toFixed(2)}m)` : ''} · Ref: ${
+        alert.tidePortName ?? 'Bermeo'
+      }`
 
       await bot.api.sendMessage(
         alert.chatId,

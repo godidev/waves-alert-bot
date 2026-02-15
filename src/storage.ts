@@ -16,10 +16,42 @@ function ensureDb(): void {
   }
 }
 
+function migrateAlert(rawAlert: any): AlertRule {
+  const alert = { ...rawAlert }
+
+  if (alert.spot === 'sopela') {
+    alert.spot = 'sopelana'
+  }
+
+  if ((!alert.windRanges || !alert.windRanges.length) && alert.windMin != null && alert.windMax != null) {
+    alert.windRanges = [{ min: Number(alert.windMin), max: Number(alert.windMax) }]
+  }
+
+  if (!alert.tidePortId) alert.tidePortId = '72'
+  if (!alert.tidePortName) alert.tidePortName = 'Bermeo'
+  if (!alert.tidePreference) alert.tidePreference = 'any'
+
+  delete alert.windMin
+  delete alert.windMax
+
+  return alert as AlertRule
+}
+
 function readDb(): DbShape {
   ensureDb()
   const raw = readFileSync(DB_PATH, 'utf8')
-  return JSON.parse(raw) as DbShape
+  const parsed = JSON.parse(raw) as DbShape
+
+  const migratedAlerts = (parsed.alerts ?? []).map(migrateAlert)
+  const changed = JSON.stringify(migratedAlerts) !== JSON.stringify(parsed.alerts ?? [])
+
+  if (changed) {
+    const next = { alerts: migratedAlerts }
+    writeFileSync(DB_PATH, JSON.stringify(next, null, 2))
+    return next
+  }
+
+  return { alerts: migratedAlerts }
 }
 
 function writeDb(next: DbShape): void {
