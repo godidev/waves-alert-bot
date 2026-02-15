@@ -8,6 +8,7 @@ import {
   touchAlertNotified,
 } from './storage.js'
 import { runChecksWithDeps, type AlertWindow } from './check-runner.js'
+import { appendCheckLog } from './check-logger.js'
 import { startHourlySchedulerAtMinute } from './scheduler.js'
 import { buildCleanupDeleteList } from './flow-cleanup.js'
 import {
@@ -58,7 +59,8 @@ bot.catch((err) => {
 })
 
 async function runChecks(): Promise<void> {
-  await runChecksWithDeps({
+  const start = Date.now()
+  const stats = await runChecksWithDeps({
     alerts: listAllAlerts(),
     minConsecutiveHours: MIN_CONSECUTIVE_HOURS,
     fetchForecasts: (spot) => fetchForecasts(API_URL, spot),
@@ -72,6 +74,15 @@ async function runChecks(): Promise<void> {
     setLastWindow: (key, window) => {
       lastSentWindows.set(key, window)
     },
+  })
+
+  appendCheckLog({
+    timestamp: new Date().toISOString(),
+    totalAlerts: stats.totalAlerts,
+    matched: stats.matched,
+    notified: stats.notified,
+    spots: stats.spots,
+    durationMs: Date.now() - start,
   })
 }
 

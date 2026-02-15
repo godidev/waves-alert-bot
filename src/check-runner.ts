@@ -179,8 +179,23 @@ async function buildCandidateMatches(
   return out
 }
 
-export async function runChecksWithDeps(deps: CheckRunnerDeps): Promise<void> {
+export interface CheckRunStats {
+  totalAlerts: number
+  matched: number
+  notified: number
+  spots: string[]
+}
+
+export async function runChecksWithDeps(
+  deps: CheckRunnerDeps,
+): Promise<CheckRunStats> {
   const now = deps.nowMs ?? (() => Date.now())
+  const stats: CheckRunStats = {
+    totalAlerts: deps.alerts.length,
+    matched: 0,
+    notified: 0,
+    spots: [...new Set(deps.alerts.map((a) => a.spot))],
+  }
 
   for (const alert of deps.alerts) {
     try {
@@ -189,6 +204,8 @@ export async function runChecksWithDeps(deps: CheckRunnerDeps): Promise<void> {
 
       const matchesFound = forecasts.filter((f) => matches(alert, f))
       if (!matchesFound.length) continue
+
+      stats.matched++
 
       const candidateMatches = await buildCandidateMatches(
         alert,
@@ -232,8 +249,11 @@ export async function runChecksWithDeps(deps: CheckRunnerDeps): Promise<void> {
       await deps.sendMessage(alert.chatId, message)
       deps.setLastWindow?.(dedupeKey, newWindow)
       deps.touchAlertNotified(alert.id, new Date(now()).toISOString())
+      stats.notified++
     } catch (err) {
       console.error(`check_alert_error alert=${alert.id}`, err)
     }
   }
+
+  return stats
 }

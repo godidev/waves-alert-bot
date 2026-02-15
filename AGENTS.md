@@ -33,10 +33,12 @@ src/
   bot-options.ts    — constantes y tipos del wizard (opciones, DraftAlert)
   bot-ui.ts         — constructores de InlineKeyboard
   bot-helpers.ts    — helpers de negocio (API, caches, conversión draft→alert)
+  check-logger.ts   — log de cada check run (últimas 48h, persistido en JSON)
 tests/
   *.test.ts         — tests unitarios (imports desde ../src/)
 data/
   alerts.json       — almacén de alertas (no commitear datos reales)
+  check-log.json    — log rotativo de checks (auto-generado, max 48 entradas)
 ```
 
 ## Convenciones de desarrollo
