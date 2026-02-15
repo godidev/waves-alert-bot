@@ -10,11 +10,12 @@ import {
 import type { AlertRule, SurfForecast, WindRange } from './types.js'
 import { nextId } from './utils.js'
 import type { TideEvent } from './alert-engine.js'
-import { runChecksWithDeps } from './check-runner.js'
+import { runChecksWithDeps, type AlertWindow } from './check-runner.js'
+import { startHourlySchedulerAtMinute } from './scheduler.js'
+import { buildCleanupDeleteList } from './flow-cleanup.js'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.app'
-const CHECK_INTERVAL_MIN = Number(process.env.CHECK_INTERVAL_MIN ?? 30)
 const MIN_CONSECUTIVE_HOURS = Number(process.env.MIN_CONSECUTIVE_HOURS ?? 2)
 const DEFAULT_SPOT = 'sopelana'
 
@@ -71,9 +72,11 @@ interface DraftAlert {
   tidePortId?: string
   tidePreference?: 'low' | 'mid' | 'high' | 'any'
   pendingAlert?: AlertRule
+  flowMessageIds: number[]
 }
 
 const drafts = new Map<number, DraftAlert>()
+const lastSentWindows = new Map<string, AlertWindow>()
 
 if (!BOT_TOKEN) throw new Error('Missing TELEGRAM_BOT_TOKEN')
 
@@ -436,7 +439,27 @@ async function runChecks(): Promise<void> {
     apiDateFromForecastDate,
     sendMessage: (chatId, message) => bot.api.sendMessage(chatId, message).then(() => undefined),
     touchAlertNotified,
+    getLastWindow: (key) => lastSentWindows.get(key),
+    setLastWindow: (key, window) => {
+      lastSentWindows.set(key, window)
+    },
   })
+}
+
+
+async function flowReply(ctx: any, draft: DraftAlert, text: string, extra?: any): Promise<void> {
+  const msg = await ctx.reply(text, extra)
+  if (msg?.message_id) draft.flowMessageIds.push(msg.message_id)
+}
+
+async function cleanupDraftMessages(chatId: number, draft: DraftAlert, keepMessageId?: number): Promise<void> {
+  for (const messageId of buildCleanupDeleteList(draft.flowMessageIds, keepMessageId)) {
+    try {
+      await bot.api.deleteMessage(chatId, messageId)
+    } catch {
+      // noop
+    }
+  }
 }
 
 const COMMANDS_HELP =
@@ -459,13 +482,20 @@ bot.command('setalert', async (ctx) => {
     windSelected: [],
     tidePortId: '72',
     tidePreference: 'any',
+    flowMessageIds: [],
   })
 
-  await ctx.reply('Pon un nombre para la alerta:')
+  const d = drafts.get(ctx.chat.id)
+  if (!d) return
+  await flowReply(ctx, d, 'Pon un nombre para la alerta:')
 })
 
 bot.command('cancel', async (ctx) => {
-  drafts.delete(ctx.chat.id)
+  const d = drafts.get(ctx.chat.id)
+  if (d) {
+    await cleanupDraftMessages(ctx.chat.id, d)
+    drafts.delete(ctx.chat.id)
+  }
   await ctx.reply('❌ Creación cancelada.')
 })
 
@@ -485,8 +515,8 @@ bot.on('message:text', async (ctx, next) => {
   d.name = text
   d.step = 'wave'
 
-  await ctx.reply(`Spot fijo: ${DEFAULT_SPOT}`)
-  await ctx.reply('Elige una o varias alturas:', {
+  await flowReply(ctx, d, `Spot fijo: ${DEFAULT_SPOT}`)
+  await flowReply(ctx, d, 'Elige una o varias alturas:', {
     reply_markup: keyboardFromOptions('wave', WAVE_OPTIONS, []),
   })
 })
@@ -511,7 +541,7 @@ bot.on('callback_query:data', async (ctx) => {
       }
       d.step = 'energy'
       await ctx.answerCallbackQuery({ text: 'OK' })
-      await ctx.reply('Elige nivel de energía:', {
+      await flowReply(ctx, d, 'Elige nivel de energía:', {
         reply_markup: keyboardFromOptions('energy', ENERGY_OPTIONS, []),
       })
       return
@@ -533,7 +563,7 @@ bot.on('callback_query:data', async (ctx) => {
       }
       d.step = 'period'
       await ctx.answerCallbackQuery({ text: 'OK' })
-      await ctx.reply('Elige uno o varios rangos de periodo:', {
+      await flowReply(ctx, d, 'Elige uno o varios rangos de periodo:', {
         reply_markup: keyboardFromOptions('period', PERIOD_OPTIONS, d.periodSelected),
       })
       return
@@ -553,7 +583,7 @@ bot.on('callback_query:data', async (ctx) => {
       }
       d.step = 'wind'
       await ctx.answerCallbackQuery({ text: 'OK' })
-      await ctx.reply('Elige una o varias direcciones de viento:', {
+      await flowReply(ctx, d, 'Elige una o varias direcciones de viento:', {
         reply_markup: windKeyboard(d.windSelected),
       })
       return
@@ -572,7 +602,7 @@ bot.on('callback_query:data', async (ctx) => {
       d.windSelected = []
       d.step = 'tidePort'
       await ctx.answerCallbackQuery({ text: 'OK' })
-      await ctx.reply('Elige puerto de marea de referencia:', {
+      await flowReply(ctx, d, 'Elige puerto de marea de referencia:', {
         reply_markup: tidePortKeyboard(d.tidePortId),
       })
       return
@@ -581,7 +611,7 @@ bot.on('callback_query:data', async (ctx) => {
     if (value === 'DONE') {
       d.step = 'tidePort'
       await ctx.answerCallbackQuery({ text: 'OK' })
-      await ctx.reply('Elige puerto de marea de referencia:', {
+      await flowReply(ctx, d, 'Elige puerto de marea de referencia:', {
         reply_markup: tidePortKeyboard(d.tidePortId),
       })
       return
@@ -606,7 +636,7 @@ bot.on('callback_query:data', async (ctx) => {
       }
       d.step = 'tidePref'
       await ctx.answerCallbackQuery({ text: 'OK' })
-      await ctx.reply('Elige marea ideal:', {
+      await flowReply(ctx, d, 'Elige marea ideal:', {
         reply_markup: tidePreferenceKeyboard(d.tidePreference),
       })
       return
@@ -639,12 +669,13 @@ bot.on('callback_query:data', async (ctx) => {
     d.step = 'confirm'
     d.pendingAlert = final
     await ctx.answerCallbackQuery({ text: 'Revisa y confirma' })
-    await ctx.reply(alertSummaryText(final), { reply_markup: confirmKeyboard() })
+    await flowReply(ctx, d, alertSummaryText(final), { reply_markup: confirmKeyboard() })
     return
   }
 
   if (prefix === 'confirm') {
     if (value === 'CANCEL') {
+      await cleanupDraftMessages(chatId, d)
       drafts.delete(chatId)
       await ctx.answerCallbackQuery({ text: 'Cancelado' })
       await ctx.reply('❌ Alerta cancelada.')
@@ -658,9 +689,10 @@ bot.on('callback_query:data', async (ctx) => {
       }
 
       insertAlert(d.pendingAlert)
-      drafts.delete(chatId)
       await ctx.answerCallbackQuery({ text: 'Alerta creada' })
-      await ctx.reply(`✅ Alerta creada: ${d.pendingAlert.id}`)
+      const doneMsg = await ctx.reply(`✅ Alerta creada: ${d.pendingAlert.id}`)
+      await cleanupDraftMessages(chatId, d, doneMsg?.message_id)
+      drafts.delete(chatId)
       return
     }
   }
@@ -719,7 +751,7 @@ void bot.api
   })
 
 bot.start()
-setInterval(() => void runChecks(), CHECK_INTERVAL_MIN * 60_000)
+startHourlySchedulerAtMinute(() => runChecks(), 10)
 void runChecks()
 
-console.log(`waves-alerts-bot running. interval=${CHECK_INTERVAL_MIN}m`)
+console.log('waves-alerts-bot running. scheduler=:10 Europe/Madrid')
