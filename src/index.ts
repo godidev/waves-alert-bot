@@ -8,7 +8,15 @@ import {
   touchAlertNotified,
 } from './storage.js'
 import type { AlertRule, SurfForecast, WindRange } from './types.js'
-import { degreesToCardinal, nextId, primaryPeriod, totalWaveHeight } from './utils.js'
+import { nextId } from './utils.js'
+import {
+  buildAlertMessage,
+  findNearestTides,
+  firstConsecutiveWindow,
+  matches,
+  type CandidateMatch,
+  type TideEvent,
+} from './alert-engine.js'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.app'
@@ -90,19 +98,6 @@ async function safeEditReplyMarkup(ctx: any, replyMarkup: InlineKeyboard): Promi
     }
     throw err
   }
-}
-
-function normalizeAngle(deg: number): number {
-  return ((deg % 360) + 360) % 360
-}
-
-function isInRange(current: number, min: number, max: number): boolean {
-  return current >= min && current <= max
-}
-
-function isWindInRange(current: number, min: number, max: number): boolean {
-  if (min <= max) return current >= min && current <= max
-  return current >= min || current <= max
 }
 
 function toggle(selected: string[], id: string): string[] {
@@ -218,13 +213,6 @@ function alertSummaryText(a: AlertRule): string {
     `• Marea: ${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`,
     `• Cooldown: ${a.cooldownMin} min`,
   ].join('\n')
-}
-
-type TideEvent = {
-  date: string
-  hora: string
-  altura: number
-  tipo: 'pleamar' | 'bajamar' | string
 }
 
 const tideDayCache = new Map<string, TideEvent[]>()
@@ -431,26 +419,6 @@ function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
   } as AlertRule
 }
 
-function matches(alert: AlertRule, f: SurfForecast): boolean {
-  const wave = totalWaveHeight(f)
-  const period = primaryPeriod(f)
-  const energy = f.energy
-  const windAngle = normalizeAngle(f.wind.angle)
-
-  const inWave =
-    !alert.waveRanges?.length ||
-    alert.waveRanges.some((r) => isInRange(wave, r.min, r.max))
-  const inPeriod =
-    !alert.periodRanges?.length ||
-    alert.periodRanges.some((r) => isInRange(period, r.min, r.max))
-  const inEnergy = energy >= alert.energyMin && energy <= alert.energyMax
-  const inWind =
-    !alert.windRanges?.length ||
-    alert.windRanges.some((r) => isWindInRange(windAngle, r.min, r.max))
-
-  return inWave && inPeriod && inEnergy && inWind
-}
-
 function cooldownOk(alert: AlertRule): boolean {
   if (!alert.lastNotifiedAt) return true
   const last = new Date(alert.lastNotifiedAt).getTime()
@@ -462,54 +430,6 @@ async function fetchForecasts(spot: string): Promise<SurfForecast[]> {
   const res = await fetch(url)
   if (!res.ok) return []
   return (await res.json()) as SurfForecast[]
-}
-
-type CandidateMatch = {
-  forecast: SurfForecast
-  tideClass: 'low' | 'mid' | 'high' | null
-  tideHeight: number | null
-}
-
-function firstConsecutiveWindow(
-  items: CandidateMatch[],
-  minHours: number,
-): { start: CandidateMatch; end: CandidateMatch; hours: number } | null {
-  if (!items.length) return null
-
-  const sorted = [...items].sort(
-    (a, b) => new Date(a.forecast.date).getTime() - new Date(b.forecast.date).getTime(),
-  )
-
-  let streakStart = 0
-  let streakLen = 1
-
-  for (let i = 1; i <= sorted.length; i++) {
-    const prev = sorted[i - 1]
-    const cur = sorted[i]
-    const isConsecutive =
-      cur &&
-      new Date(cur.forecast.date).getTime() - new Date(prev.forecast.date).getTime() === 60 * 60 * 1000
-
-    if (isConsecutive) {
-      streakLen++
-      continue
-    }
-
-    if (streakLen >= minHours) {
-      const endIndex = i - 1
-      return {
-        start: sorted[streakStart],
-        end: sorted[endIndex],
-        hours: streakLen,
-      }
-    }
-
-    streakStart = i
-    streakLen = 1
-  }
-
-  if (minHours <= 1) return { start: sorted[0], end: sorted[0], hours: 1 }
-  return null
 }
 
 async function runChecks(): Promise<void> {
@@ -559,43 +479,23 @@ async function runChecks(): Promise<void> {
       if (!window) continue
 
       const first = window.start.forecast
-      const firstTideClass = window.start.tideClass
-      const firstTideHeight = window.start.tideHeight
-
       const startDate = new Date(window.start.forecast.date)
       const endDate = new Date(window.end.forecast.date)
-      const dayText = Number.isNaN(startDate.getTime())
-        ? window.start.forecast.date
-        : startDate.toLocaleDateString('es-ES', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-          })
 
-      const startHour = Number.isNaN(startDate.getTime())
-        ? '--:--'
-        : startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false })
-      const endHour = Number.isNaN(endDate.getTime())
-        ? '--:--'
-        : new Date(endDate.getTime() + 60 * 60 * 1000).toLocaleTimeString('es-ES', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          })
+      const tidePortId = alert.tidePortId ?? '72'
+      const tideDate = apiDateFromForecastDate(window.start.forecast.date)
+      const tideEvents = await getTideEventsForDate(tidePortId, tideDate)
+      const nearestTides = findNearestTides(startDate, tideEvents)
 
-      const diffHours = Math.round((startDate.getTime() - Date.now()) / (60 * 60 * 1000))
-      const withinText = diffHours <= 0 ? 'en curso' : `dentro de ${diffHours}h`
+      const message = buildAlertMessage({
+        alert,
+        first,
+        startDate,
+        endDate,
+        nearestTides,
+      })
 
-      const tideText = `\n🌙 Marea: ${
-        firstTideClass ? tideTag(firstTideClass) : 'n/d'
-      }${firstTideHeight != null ? ` (${firstTideHeight.toFixed(2)}m)` : ''} · 📍 ${
-        alert.tidePortName ?? 'Bermeo'
-      }`
-
-      await bot.api.sendMessage(
-        alert.chatId,
-        `🚨🌊 ALERTA: ${alert.name}\n📍 Spot: ${alert.spot}\n🗓️ Coincidencia: ${dayText} / ${startHour} - ${endHour} / ${withinText}\n🏄 Swell: ${totalWaveHeight(first).toFixed(2)}m @${primaryPeriod(first).toFixed(1)}s\n⚡ Energía: ${first.energy.toFixed(0)}\n💨 Viento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)${tideText}`,
-      )
+      await bot.api.sendMessage(alert.chatId, message)
       touchAlertNotified(alert.id, new Date().toISOString())
     } catch {
       // noop
