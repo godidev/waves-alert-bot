@@ -473,7 +473,7 @@ type CandidateMatch = {
 function firstConsecutiveWindow(
   items: CandidateMatch[],
   minHours: number,
-): { start: CandidateMatch; hours: number } | null {
+): { start: CandidateMatch; end: CandidateMatch; hours: number } | null {
   if (!items.length) return null
 
   const sorted = [...items].sort(
@@ -483,24 +483,32 @@ function firstConsecutiveWindow(
   let streakStart = 0
   let streakLen = 1
 
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = new Date(sorted[i - 1].forecast.date).getTime()
-    const cur = new Date(sorted[i].forecast.date).getTime()
-    const diff = cur - prev
+  for (let i = 1; i <= sorted.length; i++) {
+    const prev = sorted[i - 1]
+    const cur = sorted[i]
+    const isConsecutive =
+      cur &&
+      new Date(cur.forecast.date).getTime() - new Date(prev.forecast.date).getTime() === 60 * 60 * 1000
 
-    if (diff === 60 * 60 * 1000) {
+    if (isConsecutive) {
       streakLen++
-    } else {
-      streakStart = i
-      streakLen = 1
+      continue
     }
 
     if (streakLen >= minHours) {
-      return { start: sorted[streakStart], hours: streakLen }
+      const endIndex = i - 1
+      return {
+        start: sorted[streakStart],
+        end: sorted[endIndex],
+        hours: streakLen,
+      }
     }
+
+    streakStart = i
+    streakLen = 1
   }
 
-  if (minHours <= 1) return { start: sorted[0], hours: 1 }
+  if (minHours <= 1) return { start: sorted[0], end: sorted[0], hours: 1 }
   return null
 }
 
@@ -554,15 +562,29 @@ async function runChecks(): Promise<void> {
       const firstTideClass = window.start.tideClass
       const firstTideHeight = window.start.tideHeight
 
-      const firstDate = new Date(first.date)
-      const dateText = Number.isNaN(firstDate.getTime())
-        ? first.date
-        : firstDate.toLocaleString('es-ES', {
-            day: '2-digit',
-            month: '2-digit',
+      const startDate = new Date(window.start.forecast.date)
+      const endDate = new Date(window.end.forecast.date)
+      const dayText = Number.isNaN(startDate.getTime())
+        ? window.start.forecast.date
+        : startDate.toLocaleDateString('es-ES', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+          })
+
+      const startHour = Number.isNaN(startDate.getTime())
+        ? '--:--'
+        : startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false })
+      const endHour = Number.isNaN(endDate.getTime())
+        ? '--:--'
+        : new Date(endDate.getTime() + 60 * 60 * 1000).toLocaleTimeString('es-ES', {
             hour: '2-digit',
             minute: '2-digit',
+            hour12: false,
           })
+
+      const diffHours = Math.round((startDate.getTime() - Date.now()) / (60 * 60 * 1000))
+      const withinText = diffHours <= 0 ? 'en curso' : `dentro de ${diffHours}h`
 
       const tideText = `\nMarea: ${
         firstTideClass ? tideTag(firstTideClass) : 'n/d'
@@ -572,7 +594,7 @@ async function runChecks(): Promise<void> {
 
       await bot.api.sendMessage(
         alert.chatId,
-        `🌊 ALERTA: ${alert.name}\nSpot: ${alert.spot}\nVentana válida: ${window.hours}h seguidas (mín ${Math.max(1, MIN_CONSECUTIVE_HOURS)}h)\nCoincidencias próximas horas: ${candidateMatches.length}\nPrimera: ${dateText}\nOla: ${totalWaveHeight(first).toFixed(2)}m\nPeriodo: ${primaryPeriod(first).toFixed(1)}s\nEnergía: ${first.energy.toFixed(0)}\nViento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)${tideText}`,
+        `🌊 ALERTA: ${alert.name}\nSpot: ${alert.spot}\nCoincidencia: ${dayText} / ${startHour} - ${endHour} / ${withinText}\nSwell: ${totalWaveHeight(first).toFixed(2)}m @${primaryPeriod(first).toFixed(1)}s\n⚡ Energía: ${first.energy.toFixed(0)}\nViento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)${tideText}`,
       )
       touchAlertNotified(alert.id, new Date().toISOString())
     } catch {
