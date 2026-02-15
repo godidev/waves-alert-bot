@@ -1,6 +1,11 @@
 import type { TideEvent } from './alert-engine.js'
 import type { DraftAlert, RangeOption } from './bot-options.js'
-import { ENERGY_OPTIONS, PERIOD_OPTIONS, TIDE_PORT_OPTIONS, WAVE_OPTIONS } from './bot-options.js'
+import {
+  ENERGY_OPTIONS,
+  PERIOD_OPTIONS,
+  TIDE_PORT_OPTIONS,
+  WAVE_OPTIONS,
+} from './bot-options.js'
 import { nextId } from './utils.js'
 import type { AlertRule, SurfForecast, WindRange } from './types.js'
 
@@ -13,7 +18,9 @@ const SPOT_COORDS: Record<string, { lat: number; lng: number }> = {
 }
 
 export function toggle(selected: string[], id: string): string[] {
-  return selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]
+  return selected.includes(id)
+    ? selected.filter((x) => x !== id)
+    : [...selected, id]
 }
 
 export function windSector(dir: string): [number, number] | null {
@@ -85,7 +92,9 @@ export function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
     windRanges: windRanges.length ? windRanges : undefined,
     windLabels: d.windSelected.length ? d.windSelected : undefined,
     tidePortId: d.tidePortId ?? '72',
-    tidePortName: TIDE_PORT_OPTIONS.find((p) => p.id === (d.tidePortId ?? '72'))?.label ?? 'Bermeo',
+    tidePortName:
+      TIDE_PORT_OPTIONS.find((p) => p.id === (d.tidePortId ?? '72'))?.label ??
+      'Bermeo',
     tidePreference: d.tidePreference ?? 'any',
     lastNotifiedAt: undefined,
     createdAt: new Date().toISOString(),
@@ -176,7 +185,10 @@ async function getSunsetDate(spot: string, date: Date): Promise<Date | null> {
   return sunset
 }
 
-export async function isWithinAlertWindow(spot: string, forecastDate: Date): Promise<boolean> {
+export async function isWithinAlertWindow(
+  spot: string,
+  forecastDate: Date,
+): Promise<boolean> {
   const localHour = localHourInMadrid(forecastDate)
   if (localHour < 5) return false
 
@@ -187,7 +199,10 @@ export async function isWithinAlertWindow(spot: string, forecastDate: Date): Pro
   return forecastDate.getTime() <= sunsetPlusOneHour.getTime()
 }
 
-export async function getTideEventsForDate(portId: string, yyyymmdd: string): Promise<TideEvent[]> {
+export async function getTideEventsForDate(
+  portId: string,
+  yyyymmdd: string,
+): Promise<TideEvent[]> {
   const cacheKey = `${portId}:${yyyymmdd}`
   const cached = tideDayCache.get(cacheKey)
   if (cached) return cached
@@ -198,7 +213,10 @@ export async function getTideEventsForDate(portId: string, yyyymmdd: string): Pr
   const res = await fetch(url)
   if (!res.ok) return []
   const json = (await res.json()) as {
-    mareas?: { fecha?: string; datos?: { marea?: { hora: string; altura: string; tipo?: string }[] } }
+    mareas?: {
+      fecha?: string
+      datos?: { marea?: { hora: string; altura: string; tipo?: string }[] }
+    }
   }
 
   const datePart = json.mareas?.fecha
@@ -216,7 +234,10 @@ export async function getTideEventsForDate(portId: string, yyyymmdd: string): Pr
   return out
 }
 
-export async function fetchForecasts(apiUrl: string, spot: string): Promise<SurfForecast[]> {
+export async function fetchForecasts(
+  apiUrl: string,
+  spot: string,
+): Promise<SurfForecast[]> {
   const url = `${apiUrl}/surf-forecast/${encodeURIComponent(spot)}`
   const res = await fetch(url)
   if (!res.ok) return []

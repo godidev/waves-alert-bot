@@ -8,23 +8,37 @@ interface DbShape {
   alerts: AlertRule[]
 }
 
+type LegacyAlert = Partial<AlertRule> & {
+  windMin?: number | string
+  windMax?: number | string
+}
+
 function ensureDb(): void {
   const dir = dirname(DB_PATH)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   if (!existsSync(DB_PATH)) {
-    writeFileSync(DB_PATH, JSON.stringify({ alerts: [] } satisfies DbShape, null, 2))
+    writeFileSync(
+      DB_PATH,
+      JSON.stringify({ alerts: [] } satisfies DbShape, null, 2),
+    )
   }
 }
 
-function migrateAlert(rawAlert: any): AlertRule {
-  const alert = { ...rawAlert }
+function migrateAlert(rawAlert: unknown): AlertRule {
+  const alert = { ...(rawAlert as LegacyAlert) }
 
   if (alert.spot === 'sopela') {
     alert.spot = 'sopelana'
   }
 
-  if ((!alert.windRanges || !alert.windRanges.length) && alert.windMin != null && alert.windMax != null) {
-    alert.windRanges = [{ min: Number(alert.windMin), max: Number(alert.windMax) }]
+  if (
+    (!alert.windRanges || !alert.windRanges.length) &&
+    alert.windMin != null &&
+    alert.windMax != null
+  ) {
+    alert.windRanges = [
+      { min: Number(alert.windMin), max: Number(alert.windMax) },
+    ]
   }
 
   if (!alert.tidePortId) alert.tidePortId = '72'
@@ -63,7 +77,8 @@ function readDb(): DbShape {
   }
 
   const migratedAlerts = (parsed.alerts ?? []).map(migrateAlert)
-  const changed = JSON.stringify(migratedAlerts) !== JSON.stringify(parsed.alerts ?? [])
+  const changed =
+    JSON.stringify(migratedAlerts) !== JSON.stringify(parsed.alerts ?? [])
 
   if (changed) {
     const next = { alerts: migratedAlerts }

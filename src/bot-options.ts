@@ -2,9 +2,22 @@ import type { AlertRule } from './types.js'
 
 export const DEFAULT_SPOT = 'sopelana'
 
-export type Step = 'name' | 'wave' | 'energy' | 'period' | 'wind' | 'tidePort' | 'tidePref' | 'confirm'
+export type Step =
+  | 'name'
+  | 'wave'
+  | 'energy'
+  | 'period'
+  | 'wind'
+  | 'tidePort'
+  | 'tidePref'
+  | 'confirm'
 
-export type RangeOption = { id: string; label: string; min: number; max: number }
+export type RangeOption = {
+  id: string
+  label: string
+  min: number
+  max: number
+}
 
 export const WAVE_OPTIONS: RangeOption[] = [
   { id: '0.5', label: '0.5m', min: 0.5, max: 0.5 },

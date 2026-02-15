@@ -7,7 +7,6 @@ import {
   listAllAlerts,
   touchAlertNotified,
 } from './storage.js'
-import type { AlertRule } from './types.js'
 import { runChecksWithDeps, type AlertWindow } from './check-runner.js'
 import { startHourlySchedulerAtMinute } from './scheduler.js'
 import { buildCleanupDeleteList } from './flow-cleanup.js'
@@ -43,7 +42,8 @@ import {
 } from './bot-helpers.js'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
-const API_URL = process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.app'
+const API_URL =
+  process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.app'
 const MIN_CONSECUTIVE_HOURS = Number(process.env.MIN_CONSECUTIVE_HOURS ?? 2)
 
 const drafts = new Map<number, DraftAlert>()
@@ -65,7 +65,8 @@ async function runChecks(): Promise<void> {
     isWithinAlertWindow,
     getTideEventsForDate,
     apiDateFromForecastDate,
-    sendMessage: (chatId, message) => bot.api.sendMessage(chatId, message).then(() => undefined),
+    sendMessage: (chatId, message) =>
+      bot.api.sendMessage(chatId, message).then(() => undefined),
     touchAlertNotified,
     getLastWindow: (key) => lastSentWindows.get(key),
     setLastWindow: (key, window) => {
@@ -74,13 +75,27 @@ async function runChecks(): Promise<void> {
   })
 }
 
-async function flowReply(ctx: any, draft: DraftAlert, text: string, extra?: any): Promise<void> {
+async function flowReply<TExtra>(
+  ctx: {
+    reply: (text: string, extra?: TExtra) => Promise<{ message_id?: number }>
+  },
+  draft: DraftAlert,
+  text: string,
+  extra?: TExtra,
+): Promise<void> {
   const msg = await ctx.reply(text, extra)
   if (msg?.message_id) draft.flowMessageIds.push(msg.message_id)
 }
 
-async function cleanupDraftMessages(chatId: number, draft: DraftAlert, keepMessageId?: number): Promise<void> {
-  for (const messageId of buildCleanupDeleteList(draft.flowMessageIds, keepMessageId)) {
+async function cleanupDraftMessages(
+  chatId: number,
+  draft: DraftAlert,
+  keepMessageId?: number,
+): Promise<void> {
+  for (const messageId of buildCleanupDeleteList(
+    draft.flowMessageIds,
+    keepMessageId,
+  )) {
     try {
       await bot.api.deleteMessage(chatId, messageId)
     } catch {
@@ -160,7 +175,9 @@ bot.on('callback_query:data', async (ctx) => {
   if (prefix === 'wave') {
     if (value === 'DONE') {
       if (!d.waveSelected.length) {
-        await ctx.answerCallbackQuery({ text: 'Selecciona al menos una altura' })
+        await ctx.answerCallbackQuery({
+          text: 'Selecciona al menos una altura',
+        })
         return
       }
       d.step = 'energy'
@@ -175,7 +192,10 @@ bot.on('callback_query:data', async (ctx) => {
     await ctx.answerCallbackQuery({
       text: `Alturas: ${d.waveSelected.join(', ') || 'ninguna'}`,
     })
-    await safeEditReplyMarkup(ctx, keyboardFromOptions('wave', WAVE_OPTIONS, d.waveSelected))
+    await safeEditReplyMarkup(
+      ctx,
+      keyboardFromOptions('wave', WAVE_OPTIONS, d.waveSelected),
+    )
     return
   }
 
@@ -188,21 +208,30 @@ bot.on('callback_query:data', async (ctx) => {
       d.step = 'period'
       await ctx.answerCallbackQuery({ text: 'OK' })
       await flowReply(ctx, d, 'Elige uno o varios rangos de periodo:', {
-        reply_markup: keyboardFromOptions('period', PERIOD_OPTIONS, d.periodSelected),
+        reply_markup: keyboardFromOptions(
+          'period',
+          PERIOD_OPTIONS,
+          d.periodSelected,
+        ),
       })
       return
     }
 
     d.energySelected = value
     await ctx.answerCallbackQuery({ text: `Energía: ${value}` })
-    await safeEditReplyMarkup(ctx, keyboardFromOptions('energy', ENERGY_OPTIONS, [value]))
+    await safeEditReplyMarkup(
+      ctx,
+      keyboardFromOptions('energy', ENERGY_OPTIONS, [value]),
+    )
     return
   }
 
   if (prefix === 'period') {
     if (value === 'DONE') {
       if (!d.periodSelected.length) {
-        await ctx.answerCallbackQuery({ text: 'Elige al menos un rango de periodo' })
+        await ctx.answerCallbackQuery({
+          text: 'Elige al menos un rango de periodo',
+        })
         return
       }
       d.step = 'wind'
@@ -217,7 +246,10 @@ bot.on('callback_query:data', async (ctx) => {
     await ctx.answerCallbackQuery({
       text: `Periodos: ${d.periodSelected.join(', ') || 'ninguno'}`,
     })
-    await safeEditReplyMarkup(ctx, keyboardFromOptions('period', PERIOD_OPTIONS, d.periodSelected))
+    await safeEditReplyMarkup(
+      ctx,
+      keyboardFromOptions('period', PERIOD_OPTIONS, d.periodSelected),
+    )
     return
   }
 
@@ -247,7 +279,9 @@ bot.on('callback_query:data', async (ctx) => {
     }
 
     d.windSelected = toggle(d.windSelected, value)
-    await ctx.answerCallbackQuery({ text: `Viento: ${d.windSelected.join(', ') || 'ANY'}` })
+    await ctx.answerCallbackQuery({
+      text: `Viento: ${d.windSelected.join(', ') || 'ANY'}`,
+    })
     await safeEditReplyMarkup(ctx, windKeyboard(d.windSelected))
     return
   }
@@ -272,7 +306,9 @@ bot.on('callback_query:data', async (ctx) => {
     }
 
     d.tidePortId = value
-    await ctx.answerCallbackQuery({ text: `Puerto: ${TIDE_PORT_OPTIONS.find((p) => p.id === value)?.label}` })
+    await ctx.answerCallbackQuery({
+      text: `Puerto: ${TIDE_PORT_OPTIONS.find((p) => p.id === value)?.label}`,
+    })
     await safeEditReplyMarkup(ctx, tidePortKeyboard(d.tidePortId))
     return
   }
@@ -293,7 +329,9 @@ bot.on('callback_query:data', async (ctx) => {
     d.step = 'confirm'
     d.pendingAlert = final
     await ctx.answerCallbackQuery({ text: 'Revisa y confirma' })
-    await flowReply(ctx, d, alertSummaryText(final), { reply_markup: confirmKeyboard() })
+    await flowReply(ctx, d, alertSummaryText(final), {
+      reply_markup: confirmKeyboard(),
+    })
     return
   }
 
@@ -332,7 +370,8 @@ bot.command('listalerts', async (ctx) => {
   const blocks = alerts.map((a, idx) => {
     const wave = a.waveLabels?.join(', ') ?? `${a.waveMin}-${a.waveMax}m`
     const energy = a.energyLabel ?? `${a.energyMin}-${a.energyMax}`
-    const period = a.periodLabels?.join(', ') ?? `${a.periodMin}-${a.periodMax}s`
+    const period =
+      a.periodLabels?.join(', ') ?? `${a.periodMin}-${a.periodMax}s`
     const wind = a.windLabels?.join(', ') ?? 'ANY'
     const tide = `${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`
 
@@ -357,14 +396,16 @@ bot.command('deletealert', async (ctx) => {
     await ctx.reply('Uso: /deletealert <id>')
     return
   }
-  await ctx.reply(deleteAlert(ctx.chat.id, id) ? '🗑️ Alerta borrada' : 'No encontré esa alerta')
+  await ctx.reply(
+    deleteAlert(ctx.chat.id, id)
+      ? '🗑️ Alerta borrada'
+      : 'No encontré esa alerta',
+  )
 })
 
-void bot.api
-  .setMyCommands(BOT_COMMANDS)
-  .catch(() => {
-    // noop
-  })
+void bot.api.setMyCommands(BOT_COMMANDS).catch(() => {
+  // noop
+})
 
 bot.start()
 startHourlySchedulerAtMinute(() => runChecks(), 10)

@@ -2,11 +2,23 @@ import { GrammyError, InlineKeyboard } from 'grammy'
 import type { RangeOption, TidePreferenceId } from './bot-options.js'
 import { TIDE_PORT_OPTIONS, TIDE_PREF_OPTIONS } from './bot-options.js'
 
-export async function safeEditReplyMarkup(ctx: any, replyMarkup: InlineKeyboard): Promise<void> {
+interface EditReplyMarkupContext {
+  editMessageReplyMarkup: (options: {
+    reply_markup: InlineKeyboard
+  }) => Promise<unknown>
+}
+
+export async function safeEditReplyMarkup(
+  ctx: EditReplyMarkupContext,
+  replyMarkup: InlineKeyboard,
+): Promise<void> {
   try {
     await ctx.editMessageReplyMarkup({ reply_markup: replyMarkup })
   } catch (err) {
-    if (err instanceof GrammyError && err.description?.includes('message is not modified')) {
+    if (
+      err instanceof GrammyError &&
+      err.description?.includes('message is not modified')
+    ) {
       return
     }
     throw err
@@ -52,16 +64,24 @@ export function windKeyboard(selected: string[]): InlineKeyboard {
 export function tidePortKeyboard(selected?: string): InlineKeyboard {
   const kb = new InlineKeyboard()
   TIDE_PORT_OPTIONS.forEach((p) => {
-    kb.text(`${selected === p.id ? '✅ ' : ''}${p.label}`, `tideport:${p.id}`).row()
+    kb.text(
+      `${selected === p.id ? '✅ ' : ''}${p.label}`,
+      `tideport:${p.id}`,
+    ).row()
   })
   kb.text('✅ Confirmar', 'tideport:DONE')
   return kb
 }
 
-export function tidePreferenceKeyboard(selected?: TidePreferenceId): InlineKeyboard {
+export function tidePreferenceKeyboard(
+  selected?: TidePreferenceId,
+): InlineKeyboard {
   const kb = new InlineKeyboard()
   TIDE_PREF_OPTIONS.forEach((p) => {
-    kb.text(`${selected === p.id ? '✅ ' : ''}${p.label}`, `tidepref:${p.id}`).row()
+    kb.text(
+      `${selected === p.id ? '✅ ' : ''}${p.label}`,
+      `tidepref:${p.id}`,
+    ).row()
   })
   return kb
 }

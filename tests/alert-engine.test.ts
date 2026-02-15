@@ -1,9 +1,20 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAlertMessage, findNearestTides, firstConsecutiveWindow, matches } from '../src/alert-engine.js'
+import {
+  buildAlertMessage,
+  findNearestTides,
+  firstConsecutiveWindow,
+  matches,
+} from '../src/alert-engine.js'
 import type { AlertRule, SurfForecast } from '../src/types.js'
 
-function mkForecast(date: string, energy = 1200, windAngle = 45, height = 1.5, period = 11): SurfForecast {
+function mkForecast(
+  date: string,
+  energy = 1200,
+  windAngle = 45,
+  height = 1.5,
+  period = 11,
+): SurfForecast {
   return {
     date,
     spot: 'sopelana',
@@ -38,15 +49,33 @@ function mkAlert(): AlertRule {
 test('matches() valida rangos de ola/periodo/energía/viento', () => {
   const alert = mkAlert()
   assert.equal(matches(alert, mkForecast('2026-02-16T10:00:00.000Z')), true)
-  assert.equal(matches(alert, mkForecast('2026-02-16T10:00:00.000Z', 500)), false)
-  assert.equal(matches(alert, mkForecast('2026-02-16T10:00:00.000Z', 1200, 180)), false)
+  assert.equal(
+    matches(alert, mkForecast('2026-02-16T10:00:00.000Z', 500)),
+    false,
+  )
+  assert.equal(
+    matches(alert, mkForecast('2026-02-16T10:00:00.000Z', 1200, 180)),
+    false,
+  )
 })
 
 test('firstConsecutiveWindow() encuentra la primera ventana consecutiva', () => {
   const items = [
-    { forecast: mkForecast('2026-02-16T11:00:00.000Z'), tideClass: null, tideHeight: null },
-    { forecast: mkForecast('2026-02-16T09:00:00.000Z'), tideClass: null, tideHeight: null },
-    { forecast: mkForecast('2026-02-16T10:00:00.000Z'), tideClass: null, tideHeight: null },
+    {
+      forecast: mkForecast('2026-02-16T11:00:00.000Z'),
+      tideClass: null,
+      tideHeight: null,
+    },
+    {
+      forecast: mkForecast('2026-02-16T09:00:00.000Z'),
+      tideClass: null,
+      tideHeight: null,
+    },
+    {
+      forecast: mkForecast('2026-02-16T10:00:00.000Z'),
+      tideClass: null,
+      tideHeight: null,
+    },
   ]
 
   const window = firstConsecutiveWindow(items, 2)

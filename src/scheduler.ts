@@ -1,6 +1,12 @@
 const MADRID_TZ = 'Europe/Madrid'
 
-function madridParts(date: Date): { year: number; month: number; day: number; hour: number; minute: number } {
+function madridParts(date: Date): {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+} {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: MADRID_TZ,
     year: 'numeric',
@@ -11,7 +17,8 @@ function madridParts(date: Date): { year: number; month: number; day: number; ho
     hour12: false,
   }).formatToParts(date)
 
-  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value ?? 0)
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0)
   return {
     year: get('year'),
     month: get('month'),

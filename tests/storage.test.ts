@@ -22,7 +22,11 @@ test('storage: recovers from corrupted JSON by resetting DB and creating backup'
 
     const files = readdirSync(dir)
     assert.ok(files.includes('alerts.json'))
-    assert.ok(files.some((f) => f.startsWith('alerts.json.corrupted-') && f.endsWith('.bak')))
+    assert.ok(
+      files.some(
+        (f) => f.startsWith('alerts.json.corrupted-') && f.endsWith('.bak'),
+      ),
+    )
   } finally {
     rmSync(dir, { recursive: true, force: true })
     delete process.env.ALERTS_DB_PATH

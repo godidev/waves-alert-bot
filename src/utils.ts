@@ -10,7 +10,9 @@ export function totalWaveHeight(f: SurfForecast): number {
 
 export function primaryPeriod(f: SurfForecast): number {
   if (!f.validSwells.length) return 0
-  const primary = f.validSwells.reduce((max, s) => (s.height > max.height ? s : max))
+  const primary = f.validSwells.reduce((max, s) =>
+    s.height > max.height ? s : max,
+  )
   return primary.period
 }
 

@@ -33,12 +33,16 @@ export function matches(alert: AlertRule, f: SurfForecast): boolean {
   const energy = f.energy
   const windAngle = normalizeAngle(f.wind.angle)
 
-  const inWave = !alert.waveRanges?.length || alert.waveRanges.some((r) => isInRange(wave, r.min, r.max))
+  const inWave =
+    !alert.waveRanges?.length ||
+    alert.waveRanges.some((r) => isInRange(wave, r.min, r.max))
   const inPeriod =
-    !alert.periodRanges?.length || alert.periodRanges.some((r) => isInRange(period, r.min, r.max))
+    !alert.periodRanges?.length ||
+    alert.periodRanges.some((r) => isInRange(period, r.min, r.max))
   const inEnergy = energy >= alert.energyMin && energy <= alert.energyMax
   const inWind =
-    !alert.windRanges?.length || alert.windRanges.some((r) => isWindInRange(windAngle, r.min, r.max))
+    !alert.windRanges?.length ||
+    alert.windRanges.some((r) => isWindInRange(windAngle, r.min, r.max))
 
   return inWave && inPeriod && inEnergy && inWind
 }
@@ -50,7 +54,8 @@ export function firstConsecutiveWindow(
   if (!items.length) return null
 
   const sorted = [...items].sort(
-    (a, b) => new Date(a.forecast.date).getTime() - new Date(b.forecast.date).getTime(),
+    (a, b) =>
+      new Date(a.forecast.date).getTime() - new Date(b.forecast.date).getTime(),
   )
 
   let streakStart = 0
@@ -61,7 +66,9 @@ export function firstConsecutiveWindow(
     const cur = sorted[i]
     const isConsecutive =
       cur &&
-      new Date(cur.forecast.date).getTime() - new Date(prev.forecast.date).getTime() === 60 * 60 * 1000
+      new Date(cur.forecast.date).getTime() -
+        new Date(prev.forecast.date).getTime() ===
+        60 * 60 * 1000
 
     if (isConsecutive) {
       streakLen++
@@ -90,7 +97,10 @@ function parseTideDate(e: TideEvent): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-export function findNearestTides(target: Date, events: TideEvent[]): {
+export function findNearestTides(
+  target: Date,
+  events: TideEvent[],
+): {
   low: TideEvent | null
   high: TideEvent | null
 } {
@@ -139,7 +149,11 @@ function formatDay(date: Date): string {
 
 function formatHour(date: Date): string {
   if (Number.isNaN(date.getTime())) return '--:--'
-  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false })
+  return date.toLocaleTimeString('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 }
 
 function tideLine(label: string, event: TideEvent | null): string {
