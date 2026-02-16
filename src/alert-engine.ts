@@ -35,11 +35,13 @@ export function matches(alert: AlertRule, f: SurfForecast): boolean {
   const windAngle = normalizeAngle(f.wind.angle)
 
   const inWave =
-    !alert.waveRanges?.length ||
-    alert.waveRanges.some((r) => isInRange(wave, r.min, r.max))
+    alert.waveRanges?.length
+      ? alert.waveRanges.some((r) => isInRange(wave, r.min, r.max))
+      : isInRange(wave, alert.waveMin, alert.waveMax)
   const inPeriod =
-    !alert.periodRanges?.length ||
-    alert.periodRanges.some((r) => isInRange(period, r.min, r.max))
+    alert.periodRanges?.length
+      ? alert.periodRanges.some((r) => isInRange(period, r.min, r.max))
+      : isInRange(period, alert.periodMin, alert.periodMax)
   const inEnergy = energy >= alert.energyMin && energy <= alert.energyMax
   const inWind =
     !alert.windRanges?.length ||

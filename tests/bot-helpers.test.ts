@@ -31,8 +31,8 @@ test('draftToAlert usa envolvente min/max de todas las opciones seleccionadas', 
   assert.equal(alert.energyMin, 0)
   assert.equal(alert.energyMax, 4000)
 
-  assert.deepEqual(alert.waveRanges, [{ min: 1, max: 3 }])
-  assert.deepEqual(alert.periodRanges, [{ min: 8, max: 16 }])
+  assert.equal(alert.waveRanges, undefined)
+  assert.equal(alert.periodRanges, undefined)
   assert.deepEqual(alert.windRanges, [{ min: 22.5, max: 112.5 }])
 })
 

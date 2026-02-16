@@ -13,6 +13,31 @@ type LegacyAlert = Partial<AlertRule> & {
   windMax?: number | string
 }
 
+function envelope(ranges: { min: number; max: number }[]): {
+  min: number
+  max: number
+} {
+  return {
+    min: Math.min(...ranges.map((r) => r.min)),
+    max: Math.max(...ranges.map((r) => r.max)),
+  }
+}
+
+function envelopeWind(ranges: { min: number; max: number }[]): {
+  min: number
+  max: number
+} {
+  const boundaries = ranges.flatMap((r) => {
+    if (r.min <= r.max) return [r.min, r.max]
+    return [0, r.max, r.min, 360]
+  })
+
+  return {
+    min: Math.min(...boundaries),
+    max: Math.max(...boundaries),
+  }
+}
+
 function ensureDb(): void {
   const dir = dirname(DB_PATH)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
@@ -41,9 +66,29 @@ function migrateAlert(rawAlert: unknown): AlertRule {
     ]
   }
 
+  if (alert.waveRanges?.length) {
+    const waveEnv = envelope(alert.waveRanges)
+    alert.waveMin = waveEnv.min
+    alert.waveMax = waveEnv.max
+  }
+
+  if (alert.periodRanges?.length) {
+    const periodEnv = envelope(alert.periodRanges)
+    alert.periodMin = periodEnv.min
+    alert.periodMax = periodEnv.max
+  }
+
+  if (alert.windRanges?.length) {
+    const windEnv = envelopeWind(alert.windRanges)
+    alert.windRanges = [{ min: windEnv.min, max: windEnv.max }]
+  }
+
   if (!alert.tidePortId) alert.tidePortId = '72'
   if (!alert.tidePortName) alert.tidePortName = 'Bermeo'
   if (!alert.tidePreference) alert.tidePreference = 'any'
+
+  delete alert.waveRanges
+  delete alert.periodRanges
 
   delete alert.windMin
   delete alert.windMax

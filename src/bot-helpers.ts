@@ -98,8 +98,6 @@ export function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
     energyMax: energyEnv.max,
     periodMin: periodEnv.min,
     periodMax: periodEnv.max,
-    waveRanges: [{ min: waveEnv.min, max: waveEnv.max }],
-    periodRanges: [{ min: periodEnv.min, max: periodEnv.max }],
     windRanges: windEnv ? [{ min: windEnv.min, max: windEnv.max }] : undefined,
     windLabels: d.windSelected.length ? d.windSelected : undefined,
     tidePortId: d.tidePortId ?? '72',
