@@ -23,6 +23,18 @@ const SPOT_COORDS: Record<string, { lat: number; lng: number }> = {
   sopelana: { lat: 43.3798, lng: -2.9808 },
 }
 
+function fmtRangeNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+function formatCompactRange(min: number, max: number, openStart?: number): string {
+  if (openStart == null || max < openStart) {
+    return `${fmtRangeNumber(min)}-${fmtRangeNumber(max)}`
+  }
+  if (min >= openStart) return `${fmtRangeNumber(openStart)}+`
+  return `${fmtRangeNumber(min)}-${fmtRangeNumber(openStart)}+`
+}
+
 export function toggle(selected: string[], id: string): string[] {
   return selected.includes(id)
     ? selected.filter((x) => x !== id)
@@ -106,12 +118,6 @@ export function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
       'Bermeo',
     tidePreference: d.tidePreference ?? 'any',
     createdAt: new Date().toISOString(),
-    waveLabels: [...d.waveSelected],
-    periodLabels: [...d.periodSelected],
-    energyLabel: d.energySelected
-      .map((id) => ENERGY_OPTIONS.find((e) => e.id === id)?.label)
-      .filter((x): x is string => Boolean(x))
-      .join(', '),
   }
 }
 
@@ -123,12 +129,16 @@ export function tideTag(pref: AlertRule['tidePreference']): string {
 }
 
 export function alertSummaryText(a: AlertRule): string {
+  const wave = `${fmtRangeNumber(a.waveMin)}-${fmtRangeNumber(a.waveMax)}m`
+  const energy = formatCompactRange(a.energyMin, a.energyMax, 4000)
+  const period = formatCompactRange(a.periodMin, a.periodMax, 16)
+
   return [
     `🧾 Resumen de alerta: ${a.name}`,
     `• Spot: ${a.spot}`,
-    `• Olas: ${a.waveLabels?.join(', ') ?? `${a.waveMin}-${a.waveMax}m`}`,
-    `• Energía: ${a.energyLabel ?? `${a.energyMin}-${a.energyMax}`}`,
-    `• Periodo: ${a.periodLabels?.join(', ') ?? `${a.periodMin}-${a.periodMax}s`}`,
+    `• Olas: ${wave}`,
+    `• Energía: ${energy}`,
+    `• Periodo: ${period}`,
     `• Viento: ${a.windLabels?.join(', ') ?? 'ANY'}`,
     `• Marea: ${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`,
   ].join('\n')

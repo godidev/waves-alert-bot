@@ -120,36 +120,14 @@ function fmtRangeNumber(value: number): string {
   return value.toFixed(1)
 }
 
-function findOpenStart(labels?: string[]): number | null {
-  if (!labels?.length) return null
-
-  const starts = labels
-    .map((label) => {
-      const match = label.match(/^(\d+(?:\.\d+)?)\+$/)
-      return match ? Number(match[1]) : null
-    })
-    .filter((value): value is number => value != null)
-
-  if (!starts.length) return null
-  return Math.min(...starts)
-}
-
-function findOpenStartInText(text?: string): number | null {
-  if (!text) return null
-  const matches = [...text.matchAll(/(\d+(?:\.\d+)?)\+/g)]
-    .map((m) => Number(m[1]))
-    .filter((n) => Number.isFinite(n))
-
-  if (!matches.length) return null
-  return Math.min(...matches)
-}
-
 function formatCompactRange(
   min: number,
   max: number,
-  openStart: number | null,
+  openStart?: number,
 ): string {
-  if (openStart == null) return `${fmtRangeNumber(min)}-${fmtRangeNumber(max)}`
+  if (openStart == null || max < openStart) {
+    return `${fmtRangeNumber(min)}-${fmtRangeNumber(max)}`
+  }
   if (min >= openStart) return `${fmtRangeNumber(openStart)}+`
   return `${fmtRangeNumber(min)}-${fmtRangeNumber(openStart)}+`
 }
@@ -421,21 +399,9 @@ bot.command('listalerts', async (ctx) => {
   }
 
   const blocks = alerts.map((a, idx) => {
-    const wave = formatCompactRange(
-      a.waveMin,
-      a.waveMax,
-      findOpenStart(a.waveLabels),
-    )
-    const energy = formatCompactRange(
-      a.energyMin,
-      a.energyMax,
-      findOpenStartInText(a.energyLabel),
-    )
-    const period = formatCompactRange(
-      a.periodMin,
-      a.periodMax,
-      findOpenStart(a.periodLabels),
-    )
+    const wave = `${fmtRangeNumber(a.waveMin)}-${fmtRangeNumber(a.waveMax)}`
+    const energy = formatCompactRange(a.energyMin, a.energyMax, 4000)
+    const period = formatCompactRange(a.periodMin, a.periodMax, 16)
     const wind = a.windLabels?.join(', ') ?? 'ANY'
     const tide = `${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`
 

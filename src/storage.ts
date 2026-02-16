@@ -89,6 +89,9 @@ function migrateAlert(rawAlert: unknown): AlertRule {
 
   delete alert.waveRanges
   delete alert.periodRanges
+  delete alert.waveLabels
+  delete alert.periodLabels
+  delete alert.energyLabel
 
   delete alert.windMin
   delete alert.windMax

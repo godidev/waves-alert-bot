@@ -106,6 +106,9 @@ test('storage: normaliza rangos legacy a min/max y elimina duplicados', async ()
               { min: 157.5, max: 202.5 },
               { min: 202.5, max: 247.5 },
             ],
+            waveLabels: ['1.0-1.5', '2.5-3.0'],
+            periodLabels: ['10-12', '16+'],
+            energyLabel: 'Media (800-1500), Alta (1500-4000)',
             createdAt: new Date().toISOString(),
           },
         ],
@@ -123,6 +126,9 @@ test('storage: normaliza rangos legacy a min/max y elimina duplicados', async ()
     assert.deepEqual(alert.windRanges, [{ min: 157.5, max: 247.5 }])
     assert.equal(alert.waveRanges, undefined)
     assert.equal(alert.periodRanges, undefined)
+    assert.equal(alert.waveLabels, undefined)
+    assert.equal(alert.periodLabels, undefined)
+    assert.equal(alert.energyLabel, undefined)
   } finally {
     rmSync(dir, { recursive: true, force: true })
     delete process.env.ALERTS_DB_PATH
