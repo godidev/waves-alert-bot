@@ -4,6 +4,7 @@ import {
   normalizeAngle,
   primaryPeriod,
   totalWaveHeight,
+  windArrowFromDegrees,
 } from './utils.js'
 
 export type TideEvent = {
@@ -187,7 +188,7 @@ export function buildAlertMessage(params: {
     `⏳ Empieza: ${withinText}`,
     `🏄 Swell: ${totalWaveHeight(first).toFixed(2)}m @${primaryPeriod(first).toFixed(1)}s`,
     `⚡ Energía: ${first.energy.toFixed(0)}`,
-    `💨 Viento: ${degreesToCardinal(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)`,
+    `💨 Viento: ${degreesToCardinal(first.wind.angle)} ${windArrowFromDegrees(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)`,
     `🌙 Mareas · 📍 ${alert.tidePortName ?? 'Bermeo'}`,
     tideLine('Bajamar más cercana', nearestTides.low),
     tideLine('Pleamar más cercana', nearestTides.high),

@@ -2,6 +2,17 @@ import type { SurfForecast } from './types.js'
 
 type Cardinal = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW'
 
+const WIND_ARROWS: Record<Cardinal, string> = {
+  N: '↓',
+  NE: '↙',
+  E: '←',
+  SE: '↖',
+  S: '↑',
+  SW: '↗',
+  W: '→',
+  NW: '↘',
+}
+
 export function totalWaveHeight(f: SurfForecast): number {
   if (!f.validSwells.length) return 0
   const sum = f.validSwells.reduce((acc, s) => acc + s.height ** 2, 0)
@@ -24,6 +35,10 @@ export function degreesToCardinal(deg: number): Cardinal {
   const dirs: Cardinal[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
   const index = Math.round(normalizeAngle(deg) / 45) % 8
   return dirs[index]
+}
+
+export function windArrowFromDegrees(deg: number): string {
+  return WIND_ARROWS[degreesToCardinal(deg)]
 }
 
 export function nextId(): string {
