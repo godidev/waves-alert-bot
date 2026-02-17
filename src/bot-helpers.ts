@@ -11,12 +11,38 @@ import { nextId } from './utils.js'
 import type { AlertRule, SurfForecast, WindRange } from './types.js'
 
 const MAX_CACHE_ENTRIES = 100
+const DEFAULT_FETCH_TIMEOUT_MS = 10_000
 const sunsetCache = new Map<string, Date>()
 const tideDayCache = new Map<string, TideEvent[]>()
+
+const FETCH_TIMEOUT_MS = (() => {
+  const parsed = Number(process.env.FETCH_TIMEOUT_MS)
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_FETCH_TIMEOUT_MS
+  return parsed
+})()
 
 function boundedSet<K, V>(cache: Map<K, V>, key: K, value: V): void {
   if (cache.size >= MAX_CACHE_ENTRIES) cache.clear()
   cache.set(key, value)
+}
+
+function fetchTimeoutSignal(timeoutMs: number): AbortSignal {
+  if (typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(timeoutMs)
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  timer.unref?.()
+  return controller.signal
+}
+
+async function fetchWithTimeout(url: string): Promise<Response | null> {
+  try {
+    return await fetch(url, { signal: fetchTimeoutSignal(FETCH_TIMEOUT_MS) })
+  } catch {
+    return null
+  }
 }
 
 const SPOT_COORDS: Record<string, { lat: number; lng: number }> = {
@@ -190,8 +216,8 @@ async function getSunsetDate(spot: string, date: Date): Promise<Date | null> {
   if (cached) return cached
 
   const url = `https://api.sunrise-sunset.org/json?lat=${coords.lat}&lng=${coords.lng}&date=${day}&formatted=0`
-  const res = await fetch(url)
-  if (!res.ok) return null
+  const res = await fetchWithTimeout(url)
+  if (!res || !res.ok) return null
 
   const json = (await res.json()) as { results?: { sunset?: string } }
   const rawSunset = json.results?.sunset
@@ -229,8 +255,8 @@ export async function getTideEventsForDate(
   const url = `https://ideihm.covam.es/api-ihm/getmarea?request=gettide&id=${encodeURIComponent(
     portId,
   )}&format=json&date=${yyyymmdd}`
-  const res = await fetch(url)
-  if (!res.ok) return []
+  const res = await fetchWithTimeout(url)
+  if (!res || !res.ok) return []
   const json = (await res.json()) as {
     mareas?: {
       fecha?: string
@@ -258,7 +284,7 @@ export async function fetchForecasts(
   spot: string,
 ): Promise<SurfForecast[]> {
   const url = `${apiUrl}/surf-forecast/${encodeURIComponent(spot)}`
-  const res = await fetch(url)
-  if (!res.ok) return []
+  const res = await fetchWithTimeout(url)
+  if (!res || !res.ok) return []
   return (await res.json()) as SurfForecast[]
 }

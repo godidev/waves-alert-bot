@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { draftToAlert } from '../src/bot-helpers.js'
+import {
+  draftToAlert,
+  fetchForecasts,
+  getTideEventsForDate,
+} from '../src/bot-helpers.js'
 import type { DraftAlert } from '../src/bot-options.js'
 
 function mkDraft(overrides: Partial<DraftAlert> = {}): DraftAlert {
@@ -45,4 +49,40 @@ test('draftToAlert devuelve null si falta una selección requerida', () => {
   )
 
   assert.equal(alert, null)
+})
+
+test('fetchForecasts usa signal y degrada a [] cuando fetch falla', async () => {
+  const originalFetch = globalThis.fetch
+  let signalSeen = false
+
+  globalThis.fetch = (async (_input, init) => {
+    signalSeen = init?.signal instanceof AbortSignal
+    throw new Error('network error')
+  }) as typeof fetch
+
+  try {
+    const forecasts = await fetchForecasts('https://backend.invalid', 'sopelana')
+    assert.deepEqual(forecasts, [])
+    assert.equal(signalSeen, true)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('getTideEventsForDate usa signal y degrada a [] cuando fetch falla', async () => {
+  const originalFetch = globalThis.fetch
+  let signalSeen = false
+
+  globalThis.fetch = (async (_input, init) => {
+    signalSeen = init?.signal instanceof AbortSignal
+    throw new Error('network error')
+  }) as typeof fetch
+
+  try {
+    const tides = await getTideEventsForDate('72', '20260217')
+    assert.deepEqual(tides, [])
+    assert.equal(signalSeen, true)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
 })
