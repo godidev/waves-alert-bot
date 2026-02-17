@@ -1,45 +1,26 @@
-const MADRID_TZ = 'Europe/Madrid'
+import { madridParts } from './time.js'
 
-function madridParts(date: Date): {
-  year: number
-  month: number
-  day: number
-  hour: number
-  minute: number
-} {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: MADRID_TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(date)
-
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((p) => p.type === type)?.value ?? 0)
-  return {
-    year: get('year'),
-    month: get('month'),
-    day: get('day'),
-    hour: get('hour'),
-    minute: get('minute'),
-  }
-}
+const MAX_SCAN_MINUTES = 6 * 60
 
 export function msUntilNextMadridHourMinute(now: Date, minute = 10): number {
-  const p = madridParts(now)
-  const target = new Date(now)
-
-  if (p.minute < minute) {
-    target.setMinutes(target.getMinutes() + (minute - p.minute), 0, 0)
-    return Math.max(1_000, target.getTime() - now.getTime())
+  const targetMinute = Math.trunc(minute)
+  if (!Number.isFinite(targetMinute) || targetMinute < 0 || targetMinute > 59) {
+    throw new RangeError('minute must be between 0 and 59')
   }
 
-  const add = 60 - p.minute + minute
-  target.setMinutes(target.getMinutes() + add, 0, 0)
-  return Math.max(1_000, target.getTime() - now.getTime())
+  const nowMs = now.getTime()
+  const firstMinuteBoundary =
+    Math.floor((nowMs + 1_000) / (60 * 1000)) * 60 * 1000
+
+  for (let offset = 0; offset <= MAX_SCAN_MINUTES; offset++) {
+    const candidateMs = firstMinuteBoundary + offset * 60 * 1000
+    if (candidateMs <= nowMs) continue
+    const candidateMinute = madridParts(new Date(candidateMs)).minute
+    if (candidateMinute !== targetMinute) continue
+    return Math.max(1_000, candidateMs - nowMs)
+  }
+
+  return Math.max(1_000, 60 * 60 * 1000)
 }
 
 export function startHourlySchedulerAtMinute(

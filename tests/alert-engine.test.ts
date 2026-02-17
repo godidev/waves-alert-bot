@@ -119,3 +119,18 @@ test('buildAlertMessage() usa nuevo formato de fecha/rango/empieza y mareas cerc
   assert.match(msg, /Bajamar más cercana: 07:00 \(0.80m\)/)
   assert.match(msg, /Pleamar más cercana: 12:30 \(3.20m\)/)
 })
+
+test('buildAlertMessage() formatea día/hora siempre en Europe/Madrid', () => {
+  const alert = mkAlert()
+  const first = mkForecast('2026-01-15T10:00:00.000Z')
+  const msg = buildAlertMessage({
+    alert,
+    first,
+    startDate: new Date('2026-01-15T10:00:00.000Z'),
+    endDate: new Date('2026-01-15T12:00:00.000Z'),
+    nearestTides: { low: null, high: null },
+    nowMs: new Date('2026-01-15T08:00:00.000Z').getTime(),
+  })
+
+  assert.match(msg, /⏰ Rango: 11:00 - 14:00/)
+})

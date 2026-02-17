@@ -13,3 +13,15 @@ test('scheduler calcula HH:10 de la hora actual si está antes', () => {
   const ms = msUntilNextMadridHourMinute(now, 10)
   assert.equal(ms, 7 * 60 * 1000)
 })
+
+test('scheduler resuelve DST fin (hora repetida) sin saltarse el próximo :10', () => {
+  const now = new Date('2026-10-25T00:50:00.000Z')
+  const ms = msUntilNextMadridHourMinute(now, 10)
+  assert.equal(ms, 20 * 60 * 1000)
+})
+
+test('scheduler resuelve DST fin cerca del cambio sin disparo inmediato erróneo', () => {
+  const now = new Date('2026-10-25T01:05:00.000Z')
+  const ms = msUntilNextMadridHourMinute(now, 10)
+  assert.equal(ms, 5 * 60 * 1000)
+})

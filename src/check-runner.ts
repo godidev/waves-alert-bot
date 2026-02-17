@@ -6,6 +6,7 @@ import {
   type CandidateMatch,
   type TideEvent,
 } from './alert-engine.js'
+import { parseMadridLocalDateTime } from './time.js'
 import type { AlertRule, SurfForecast } from './types.js'
 
 export interface AlertWindow {
@@ -47,9 +48,14 @@ function estimateTideHeightAt(
   target: Date,
   events: TideEvent[],
 ): number | null {
+  type TideRow = TideEvent & { at: Date }
+
   const rows = events
-    .map((e) => ({ ...e, at: new Date(`${e.date}T${e.hora}:00`) }))
-    .filter((e) => !Number.isNaN(e.at.getTime()))
+    .map((e) => ({
+      ...e,
+      at: parseMadridLocalDateTime(e.date, e.hora),
+    }))
+    .filter((e): e is TideRow => e.at instanceof Date)
     .sort((a, b) => a.at.getTime() - b.at.getTime())
 
   if (!rows.length) return null
@@ -88,8 +94,9 @@ function findNearestHighTideTs(
         .includes('pleamar')
     )
       continue
-    const at = new Date(`${e.date}T${e.hora}:00`).getTime()
-    if (Number.isNaN(at)) continue
+    const atDate = parseMadridLocalDateTime(e.date, e.hora)
+    if (!atDate) continue
+    const at = atDate.getTime()
     const diff = Math.abs(at - t)
     if (diff < bestDiff) {
       best = at

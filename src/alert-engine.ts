@@ -6,6 +6,7 @@ import {
   totalWaveHeight,
   windArrowFromDegrees,
 } from './utils.js'
+import { MADRID_TIME_ZONE, parseMadridLocalDateTime } from './time.js'
 
 export type TideEvent = {
   date: string
@@ -97,8 +98,7 @@ export function firstConsecutiveWindow(
 }
 
 function parseTideDate(e: TideEvent): Date | null {
-  const d = new Date(`${e.date}T${e.hora}:00`)
-  return Number.isNaN(d.getTime()) ? null : d
+  return parseMadridLocalDateTime(e.date, e.hora)
 }
 
 export function findNearestTides(
@@ -145,6 +145,7 @@ function formatWithinText(startDate: Date, nowMs = Date.now()): string {
 function formatDay(date: Date): string {
   if (Number.isNaN(date.getTime())) return 'n/d'
   return date.toLocaleDateString('es-ES', {
+    timeZone: MADRID_TIME_ZONE,
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -154,6 +155,7 @@ function formatDay(date: Date): string {
 function formatHour(date: Date): string {
   if (Number.isNaN(date.getTime())) return '--:--'
   return date.toLocaleTimeString('es-ES', {
+    timeZone: MADRID_TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
