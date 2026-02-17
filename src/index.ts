@@ -68,7 +68,9 @@ async function runChecks(): Promise<void> {
     getTideEventsForDate,
     apiDateFromForecastDate,
     sendMessage: (chatId, message) =>
-      bot.api.sendMessage(chatId, message).then(() => undefined),
+      bot.api
+        .sendMessage(chatId, message, { parse_mode: 'HTML' })
+        .then(() => undefined),
     touchAlertNotified,
     getLastWindow: (key) => lastSentWindows.get(key),
     setLastWindow: (key, window) => {

@@ -55,7 +55,12 @@ export function matches(alert: AlertRule, f: SurfForecast): boolean {
 export function firstConsecutiveWindow(
   items: CandidateMatch[],
   minHours: number,
-): { start: CandidateMatch; end: CandidateMatch; hours: number } | null {
+): {
+  start: CandidateMatch
+  end: CandidateMatch
+  hours: number
+  items: CandidateMatch[]
+} | null {
   if (!items.length) return null
 
   const sorted = [...items].sort(
@@ -86,6 +91,7 @@ export function firstConsecutiveWindow(
         start: sorted[streakStart],
         end: sorted[endIndex],
         hours: streakLen,
+        items: sorted.slice(streakStart, endIndex + 1),
       }
     }
 
@@ -93,7 +99,8 @@ export function firstConsecutiveWindow(
     streakLen = 1
   }
 
-  if (minHours <= 1) return { start: sorted[0], end: sorted[0], hours: 1 }
+  if (minHours <= 1)
+    return { start: sorted[0], end: sorted[0], hours: 1, items: [sorted[0]] }
   return null
 }
 
@@ -167,20 +174,62 @@ function tideLine(label: string, event: TideEvent | null): string {
   return `• ${label}: ${event.hora} (${event.altura.toFixed(2)}m)`
 }
 
+function formatHourlyTable(forecasts: SurfForecast[], maxCols = 6): string | null {
+  if (!forecasts.length) return null
+
+  const slice = [...forecasts]
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(0, maxCols)
+
+  const labelWidth = 8
+  const colWidth = 7
+
+  const row = (label: string, values: string[]): string =>
+    `${label.padEnd(labelWidth)}${values.map((v) => v.padEnd(colWidth)).join('')}`
+
+  const hours = slice.map((f) => formatHour(new Date(f.date)))
+  const swells = slice.map((f) => `${totalWaveHeight(f).toFixed(1)}m`)
+  const energies = slice.map((f) => `${Math.round(f.energy)}`)
+  const winds = slice.map(
+    (f) => `${Math.round(f.wind.speed)}${windArrowFromDegrees(f.wind.angle)}`,
+  )
+  const periods = slice.map((f) => `${Math.round(primaryPeriod(f))}s`)
+
+  return [
+    '<pre>',
+    row('Hora', hours),
+    row('Swell', swells),
+    row('Energía', energies),
+    row('Viento', winds),
+    row('Período', periods),
+    '</pre>',
+  ].join('\n')
+}
+
 export function buildAlertMessage(params: {
   alert: AlertRule
   first: SurfForecast
   startDate: Date
   endDate: Date
   nearestTides: { low: TideEvent | null; high: TideEvent | null }
+  windowForecasts?: SurfForecast[]
   nowMs?: number
 }): string {
-  const { alert, first, startDate, endDate, nearestTides, nowMs } = params
+  const {
+    alert,
+    first,
+    startDate,
+    endDate,
+    nearestTides,
+    windowForecasts = [first],
+    nowMs,
+  } = params
 
   const dayText = formatDay(startDate)
   const startHour = formatHour(startDate)
   const endHour = formatHour(new Date(endDate.getTime() + 60 * 60 * 1000))
   const withinText = formatWithinText(startDate, nowMs)
+  const hourlyTable = formatHourlyTable(windowForecasts)
 
   return [
     `🚨🌊 ALERTA: ${alert.name}`,
@@ -192,9 +241,10 @@ export function buildAlertMessage(params: {
     `• ⏳ Empieza: ${withinText}`,
     '',
     '🏄 Condiciones',
-    `• Swell: ${totalWaveHeight(first).toFixed(2)}m @${primaryPeriod(first).toFixed(1)}s`,
+    `• Swell base: ${totalWaveHeight(first).toFixed(2)}m @${primaryPeriod(first).toFixed(1)}s`,
     `• Energía: ${first.energy.toFixed(0)}`,
-    `• Viento: ${degreesToCardinal(first.wind.angle)} ${windArrowFromDegrees(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)`,
+    `• Viento base: ${degreesToCardinal(first.wind.angle)} ${windArrowFromDegrees(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)`,
+    ...(hourlyTable ? ['', '📊 Detalle hora a hora', hourlyTable] : []),
     '',
     `🌙 Mareas · 📍 ${alert.tidePortName ?? 'Bermeo'}`,
     tideLine('Bajamar más cercana', nearestTides.low),

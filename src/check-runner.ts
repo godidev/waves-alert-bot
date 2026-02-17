@@ -250,6 +250,7 @@ export async function runChecksWithDeps(
         startDate,
         endDate,
         nearestTides,
+        windowForecasts: window.items.map((i) => i.forecast),
         nowMs: now(),
       })
 

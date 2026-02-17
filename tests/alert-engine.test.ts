@@ -116,6 +116,8 @@ test('buildAlertMessage() usa nuevo formato de fecha/rango/empieza y mareas cerc
   assert.match(msg, /⏰ Rango:/)
   assert.match(msg, /⏳ Empieza:/)
   assert.doesNotMatch(msg, /Coincidencia/)
+  assert.match(msg, /📊 Detalle hora a hora/)
+  assert.match(msg, /Hora\s+11:00/)
   assert.match(msg, /Bajamar más cercana: 07:00 \(0.80m\)/)
   assert.match(msg, /Pleamar más cercana: 12:30 \(3.20m\)/)
 })
