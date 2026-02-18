@@ -463,18 +463,33 @@ bot.command('status', async (ctx) => {
     return
   }
 
-  const d = last.discardReasons
+  // Aggregate discard reasons and matched hours across entire log (48h)
+  const agg = { wave: 0, period: 0, energy: 0, wind: 0, tide: 0, light: 0 }
+  let totalMatched = 0
+  for (const entry of log) {
+    const dr = entry.discardReasons
+    agg.wave += dr.wave
+    agg.period += dr.period
+    agg.energy += dr.energy
+    agg.wind += dr.wind
+    agg.tide += dr.tide
+    agg.light += dr.light
+    totalMatched += entry.matched
+  }
+
   const lastLines = [
     '',
     `Último check: ${fmtDate(last.timestamp)} — ${last.durationMs}ms`,
     `Matched: ${last.matched} | Enviadas: ${last.notified}`,
-    'Motivos de descarte (último check):',
-    `  - viento: ${d.wind}`,
-    `  - marea: ${d.tide}`,
-    `  - ola: ${d.wave}`,
-    `  - periodo: ${d.period}`,
-    `  - energía: ${d.energy}`,
-    `  - luz (fuera de horario): ${d.light}`,
+    '',
+    `Motivos (${log.length} checks):`,
+    `  - viento: ${agg.wind}h ❌`,
+    `  - periodo: ${agg.period}h ❌`,
+    `  - ola: ${agg.wave}h ❌`,
+    `  - energía: ${agg.energy}h ❌`,
+    `  - marea: ${agg.tide}h ❌`,
+    `  - luz: ${agg.light}h ❌`,
+    `Horas que cumplen todo: ${totalMatched}h ✅`,
   ]
 
   await ctx.reply([...header, ...lastLines].join('\n'))
