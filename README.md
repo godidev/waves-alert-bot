@@ -81,6 +81,10 @@ Formato actual:
 
 ## PM2 (producción)
 ```bash
+# build de producción
+npm ci
+npm run build
+
 # arrancar con ecosystem
 pm2 start ecosystem.config.cjs
 
@@ -93,7 +97,15 @@ pm2 restart ecosystem.config.cjs --only waves-alerts-bot
 
 # persistir procesos
 pm2 save
+
+# autoarranque al reiniciar servidor
+pm2 startup
+
+# rotación de logs (opcional recomendado)
+pm2 install pm2-logrotate
 ```
+
+`ecosystem.config.cjs` usa `cwd` dinámico para ser portable entre máquinas/rutas.
 
 ## Almacenamiento
 - Alertas en `data/alerts.json`.
