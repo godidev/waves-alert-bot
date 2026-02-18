@@ -635,6 +635,7 @@ bot.command('listalerts', async (ctx) => {
     const period = formatCompactRange(a.periodMin, a.periodMax, 16)
     const wind = a.windLabels?.join(', ') ?? 'ANY'
     const tide = `${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`
+    const status = a.enabled === false ? 'pausada' : 'activa'
 
     const block = [
       `#${idx + 1} · ${a.name}`,
