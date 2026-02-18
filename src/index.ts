@@ -564,6 +564,22 @@ void bot.api.setMyCommands(BOT_COMMANDS).catch(() => {
   // noop
 })
 
+if (DEV_CHAT_ID) {
+  void bot.api
+    .setMyCommands(
+      [
+        { command: 'status', description: 'Estado del bot' },
+        { command: 'checklog', description: 'Últimos check runs' },
+        { command: 'runnow', description: 'Forzar check run' },
+        { command: 'alerts_all', description: 'Todas las alertas (admin)' },
+      ],
+      { scope: { type: 'chat', chat_id: DEV_CHAT_ID } },
+    )
+    .catch(() => {
+      // noop
+    })
+}
+
 bot.start()
 startHourlySchedulerAtMinute(
   () =>
