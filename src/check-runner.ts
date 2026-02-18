@@ -251,7 +251,6 @@ export async function runChecksWithDeps(
         endDate,
         nearestTides,
         windowForecasts: window.items.map((i) => i.forecast),
-        nowMs: now(),
       })
 
       await deps.sendMessage(alert.chatId, message)

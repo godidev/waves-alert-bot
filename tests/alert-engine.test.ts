@@ -109,17 +109,22 @@ test('buildAlertMessage() usa nuevo formato de fecha/rango/empieza y mareas cerc
       low: { date: '2026-02-16', hora: '07:00', altura: 0.8, tipo: 'bajamar' },
       high: { date: '2026-02-16', hora: '12:30', altura: 3.2, tipo: 'pleamar' },
     },
-    nowMs: new Date('2026-02-16T08:00:00.000Z').getTime(),
   })
 
-  assert.match(msg, /📅 Fecha:/)
-  assert.match(msg, /⏰ Rango:/)
-  assert.match(msg, /⏳ Empieza:/)
+  assert.match(msg, /📍 sopelana/)
+  assert.match(msg, /📅 .*/)
+  assert.match(msg, /⏰ 11:00-14:00/)
+  assert.doesNotMatch(msg, /⏳ Empieza:/)
   assert.doesNotMatch(msg, /Coincidencia/)
-  assert.match(msg, /📊 Detalle hora a hora/)
-  assert.match(msg, /Hora\s+11:00/)
-  assert.match(msg, /Bajamar más cercana: 07:00 \(0.80m\)/)
-  assert.match(msg, /Pleamar más cercana: 12:30 \(3.20m\)/)
+  assert.match(msg, /📊 Detalle h\/h \(Ola m · Viento km\/h · Período s\)/)
+  assert.match(msg, /<code>Hora.*\|.*🌊.*\|.*⚡.*\|.*💨.*\|.*⏱.*<\/code>/)
+  assert.match(msg, /<code>12:30\s+\|\s+⬆️ Marea alta \(3.20m\).*<\/code>/)
+  assert.match(msg, /<code>07:00\s+\|\s+⬇️ Marea baja \(0.80m\).*<\/code>/)
+  assert.match(msg, /\. \./)
+  assert.match(
+    msg,
+    /<code>11:00\s+\|\s+1\.5\s+\|\s+1200\s+\|\s+10↙\s+\|\s+11<\/code>/,
+  )
 })
 
 test('buildAlertMessage() formatea día/hora siempre en Europe/Madrid', () => {
@@ -131,8 +136,8 @@ test('buildAlertMessage() formatea día/hora siempre en Europe/Madrid', () => {
     startDate: new Date('2026-01-15T10:00:00.000Z'),
     endDate: new Date('2026-01-15T12:00:00.000Z'),
     nearestTides: { low: null, high: null },
-    nowMs: new Date('2026-01-15T08:00:00.000Z').getTime(),
   })
 
-  assert.match(msg, /⏰ Rango: 11:00 - 14:00/)
+  assert.match(msg, /📅 .*/)
+  assert.match(msg, /⏰ 11:00-14:00/)
 })

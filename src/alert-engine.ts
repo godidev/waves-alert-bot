@@ -36,14 +36,12 @@ export function matches(alert: AlertRule, f: SurfForecast): boolean {
   const energy = f.energy
   const windAngle = normalizeAngle(f.wind.angle)
 
-  const inWave =
-    alert.waveRanges?.length
-      ? alert.waveRanges.some((r) => isInRange(wave, r.min, r.max))
-      : isInRange(wave, alert.waveMin, alert.waveMax)
-  const inPeriod =
-    alert.periodRanges?.length
-      ? alert.periodRanges.some((r) => isInRange(period, r.min, r.max))
-      : isInRange(period, alert.periodMin, alert.periodMax)
+  const inWave = alert.waveRanges?.length
+    ? alert.waveRanges.some((r) => isInRange(wave, r.min, r.max))
+    : isInRange(wave, alert.waveMin, alert.waveMax)
+  const inPeriod = alert.periodRanges?.length
+    ? alert.periodRanges.some((r) => isInRange(period, r.min, r.max))
+    : isInRange(period, alert.periodMin, alert.periodMax)
   const inEnergy = energy >= alert.energyMin && energy <= alert.energyMax
   const inWind =
     !alert.windRanges?.length ||
@@ -143,12 +141,6 @@ export function findNearestTides(
   return { low, high }
 }
 
-function formatWithinText(startDate: Date, nowMs = Date.now()): string {
-  if (Number.isNaN(startDate.getTime())) return 'n/d'
-  const diffHours = Math.round((startDate.getTime() - nowMs) / (60 * 60 * 1000))
-  return diffHours <= 0 ? 'en curso' : `en ${diffHours}h`
-}
-
 function formatDay(date: Date): string {
   if (Number.isNaN(date.getTime())) return 'n/d'
   return date.toLocaleDateString('es-ES', {
@@ -169,40 +161,249 @@ function formatHour(date: Date): string {
   })
 }
 
-function tideLine(label: string, event: TideEvent | null): string {
-  if (!event) return `• ${label}: n/d`
-  return `• ${label}: ${event.hora} (${event.altura.toFixed(2)}m)`
+function tideBandLine(
+  label: 'Marea alta' | 'Marea baja',
+  event: TideEvent,
+  hourWidth: number,
+  rightWidth: number,
+): string {
+  const icon = label === 'Marea alta' ? '⬆️' : '⬇️'
+  const hour = padEndDisplay(event.hora, hourWidth)
+  const rightText = `${icon} ${label} (${event.altura.toFixed(2)}m)`
+  const right = padCenterDisplay(rightText, rightWidth)
+  return `${hour} | ${right}`
 }
 
-function formatHourlyTable(forecasts: SurfForecast[], maxCols = 6): string | null {
+function subtleDividerLine(hourWidth: number, rightWidth: number): string {
+  const hour = ' '.repeat(hourWidth)
+  const pattern = '. '.repeat(Math.ceil(rightWidth / 2)).slice(0, rightWidth)
+  return `${hour} | ${pattern}`.trimEnd()
+}
+
+function charDisplayWidth(ch: string): number {
+  const cp = ch.codePointAt(0)
+  if (cp == null) return 0
+
+  // zero-width modifiers / joiners
+  if (
+    cp === 0x200d ||
+    cp === 0xfe0e ||
+    cp === 0xfe0f ||
+    (cp >= 0x0300 && cp <= 0x036f) ||
+    (cp >= 0x1ab0 && cp <= 0x1aff) ||
+    (cp >= 0x1dc0 && cp <= 0x1dff) ||
+    (cp >= 0x20d0 && cp <= 0x20ff) ||
+    (cp >= 0xfe20 && cp <= 0xfe2f)
+  ) {
+    return 0
+  }
+
+  // East Asian wide/full-width + common emoji blocks
+  if (
+    (cp >= 0x1100 && cp <= 0x115f) ||
+    (cp >= 0x2329 && cp <= 0x232a) ||
+    (cp >= 0x2300 && cp <= 0x23ff) ||
+    (cp >= 0x2600 && cp <= 0x26ff) ||
+    (cp >= 0x2700 && cp <= 0x27bf) ||
+    (cp >= 0x2e80 && cp <= 0xa4cf) ||
+    (cp >= 0xac00 && cp <= 0xd7a3) ||
+    (cp >= 0xf900 && cp <= 0xfaff) ||
+    (cp >= 0xfe10 && cp <= 0xfe19) ||
+    (cp >= 0xfe30 && cp <= 0xfe6f) ||
+    (cp >= 0xff00 && cp <= 0xff60) ||
+    (cp >= 0xffe0 && cp <= 0xffe6) ||
+    (cp >= 0x1f300 && cp <= 0x1faff)
+  ) {
+    return 2
+  }
+
+  return 1
+}
+
+function stringDisplayWidth(value: string): number {
+  return Array.from(value).reduce((acc, ch) => acc + charDisplayWidth(ch), 0)
+}
+
+function padEndDisplay(value: string, width: number): string {
+  const pad = Math.max(0, width - stringDisplayWidth(value))
+  return `${value}${' '.repeat(pad)}`
+}
+
+function padStartDisplay(value: string, width: number): string {
+  const pad = Math.max(0, width - stringDisplayWidth(value))
+  return `${' '.repeat(pad)}${value}`
+}
+
+function padCenterDisplay(value: string, width: number): string {
+  const pad = Math.max(0, width - stringDisplayWidth(value))
+  const left = Math.floor(pad / 2)
+  const right = pad - left
+  return `${' '.repeat(left)}${value}${' '.repeat(right)}`
+}
+
+function formatHourlyTable(
+  forecasts: SurfForecast[],
+  nearestTides: { low: TideEvent | null; high: TideEvent | null },
+  maxCols = 6,
+): string | null {
   if (!forecasts.length) return null
 
   const slice = [...forecasts]
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, maxCols)
 
-  const labelWidth = 8
-  const colWidth = 7
+  const columns = [
+    {
+      header: 'Hora',
+      values: slice.map((f) => formatHour(new Date(f.date))),
+    },
+    {
+      header: '🌊',
+      values: slice.map((f) => totalWaveHeight(f).toFixed(1)),
+    },
+    {
+      header: '⚡',
+      values: slice.map((f) => `${Math.round(f.energy)}`),
+    },
+    {
+      header: '💨',
+      values: slice.map(
+        (f) =>
+          `${Math.round(f.wind.speed)}${windArrowFromDegrees(f.wind.angle)}`,
+      ),
+    },
+    {
+      header: '⏱',
+      values: slice.map((f) => `${Math.round(primaryPeriod(f))}`),
+    },
+  ]
 
-  const row = (label: string, values: string[]): string =>
-    `${label.padEnd(labelWidth)}${values.map((v) => v.padEnd(colWidth)).join('')}`
+  const numericColumns = new Set([1, 2, 4])
 
-  const hours = slice.map((f) => formatHour(new Date(f.date)))
-  const swells = slice.map((f) => `${totalWaveHeight(f).toFixed(1)}m`)
-  const energies = slice.map((f) => `${Math.round(f.energy)}`)
-  const winds = slice.map(
-    (f) => `${Math.round(f.wind.speed)}${windArrowFromDegrees(f.wind.angle)}`,
+  const widths = columns.map((col) =>
+    Math.max(
+      stringDisplayWidth(col.header),
+      ...col.values.map(stringDisplayWidth),
+    ),
   )
-  const periods = slice.map((f) => `${Math.round(primaryPeriod(f))}s`)
+
+  const fmt = (value: string, idx: number, header = false): string => {
+    if (header) return padEndDisplay(value, widths[idx])
+    if (numericColumns.has(idx)) return padStartDisplay(value, widths[idx])
+    return padEndDisplay(value, widths[idx])
+  }
+
+  const header = columns
+    .map((c, idx) => fmt(c.header, idx, true))
+    .join(' | ')
+    .trimEnd()
+  const separator = widths
+    .map((w) => '-'.repeat(w))
+    .join(' | ')
+    .trimEnd()
+  const rows = slice.map((forecast, rowIdx) => ({
+    at: new Date(forecast.date).getTime(),
+    text: columns
+      .map((c, colIdx) => fmt(c.values[rowIdx], colIdx))
+      .join(' | ')
+      .trimEnd(),
+  }))
+
+  const tideMarkers = [
+    nearestTides.high
+      ? {
+          at: parseMadridLocalDateTime(
+            nearestTides.high.date,
+            nearestTides.high.hora,
+          )?.getTime(),
+          event: nearestTides.high,
+          label: 'Marea alta' as const,
+        }
+      : null,
+    nearestTides.low
+      ? {
+          at: parseMadridLocalDateTime(
+            nearestTides.low.date,
+            nearestTides.low.hora,
+          )?.getTime(),
+          event: nearestTides.low,
+          label: 'Marea baja' as const,
+        }
+      : null,
+  ]
+    .filter(
+      (
+        row,
+      ): row is {
+        at: number | undefined
+        event: TideEvent
+        label: 'Marea alta' | 'Marea baja'
+      } => Boolean(row),
+    )
+    .filter(
+      (
+        row,
+      ): row is {
+        at: number
+        event: TideEvent
+        label: 'Marea alta' | 'Marea baja'
+      } => Number.isFinite(row.at),
+    )
+    .sort((a, b) => a.at - b.at)
+
+  const rightAreaWidth =
+    widths.slice(1).reduce((sum, w) => sum + w, 0) + (widths.length - 2) * 3
+
+  const lines: string[] = []
+  const firstAt = rows[0].at
+  const lastAt = rows[rows.length - 1].at
+  const beforeRows = tideMarkers.filter((t) => t.at < firstAt)
+  const inRangeRows = tideMarkers.filter(
+    (t) => t.at >= firstAt && t.at <= lastAt,
+  )
+  const afterRows = tideMarkers.filter((t) => t.at > lastAt)
+
+  for (const tide of beforeRows) {
+    lines.push(tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth))
+  }
+
+  if (beforeRows.length) {
+    lines.push(subtleDividerLine(widths[0], rightAreaWidth))
+  }
+
+  let inRangeIdx = 0
+  for (const row of rows) {
+    while (
+      inRangeIdx < inRangeRows.length &&
+      inRangeRows[inRangeIdx].at <= row.at
+    ) {
+      const tide = inRangeRows[inRangeIdx]
+      lines.push(
+        tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth),
+      )
+      inRangeIdx++
+    }
+    lines.push(row.text)
+  }
+
+  while (inRangeIdx < inRangeRows.length) {
+    const tide = inRangeRows[inRangeIdx]
+    lines.push(tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth))
+    inRangeIdx++
+  }
+
+  if (afterRows.length) {
+    lines.push(subtleDividerLine(widths[0], rightAreaWidth))
+  }
+
+  for (const tide of afterRows) {
+    lines.push(tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth))
+  }
 
   return [
-    '<pre>',
-    row('Hora', hours),
-    row('Swell', swells),
-    row('Energía', energies),
-    row('Viento', winds),
-    row('Período', periods),
-    '</pre>',
+    `<code>${header}</code>`,
+    `<code>${separator}</code>`,
+    ...lines.map((line) => `<code>${line}</code>`),
   ].join('\n')
 }
 
@@ -213,7 +414,6 @@ export function buildAlertMessage(params: {
   endDate: Date
   nearestTides: { low: TideEvent | null; high: TideEvent | null }
   windowForecasts?: SurfForecast[]
-  nowMs?: number
 }): string {
   const {
     alert,
@@ -222,32 +422,23 @@ export function buildAlertMessage(params: {
     endDate,
     nearestTides,
     windowForecasts = [first],
-    nowMs,
   } = params
 
   const dayText = formatDay(startDate)
   const startHour = formatHour(startDate)
   const endHour = formatHour(new Date(endDate.getTime() + 60 * 60 * 1000))
-  const withinText = formatWithinText(startDate, nowMs)
-  const hourlyTable = formatHourlyTable(windowForecasts)
+  const hourlyTable = formatHourlyTable(windowForecasts, nearestTides)
 
   return [
     `🚨🌊 ALERTA: ${alert.name}`,
-    `📍 Spot: ${alert.spot}`,
-    '',
-    '🕒 Ventana',
-    `• 📅 Fecha: ${dayText}`,
-    `• ⏰ Rango: ${startHour} - ${endHour}`,
-    `• ⏳ Empieza: ${withinText}`,
-    '',
-    '🏄 Condiciones',
-    `• Swell base: ${totalWaveHeight(first).toFixed(2)}m @${primaryPeriod(first).toFixed(1)}s`,
-    `• Energía: ${first.energy.toFixed(0)}`,
-    `• Viento base: ${degreesToCardinal(first.wind.angle)} ${windArrowFromDegrees(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)`,
-    ...(hourlyTable ? ['', '📊 Detalle hora a hora', hourlyTable] : []),
-    '',
-    `🌙 Mareas · 📍 ${alert.tidePortName ?? 'Bermeo'}`,
-    tideLine('Bajamar más cercana', nearestTides.low),
-    tideLine('Pleamar más cercana', nearestTides.high),
+    `📍 ${alert.spot}`,
+    `📅 ${dayText}`,
+    `⏰ ${startHour}-${endHour}`,
+    `🏄 ${totalWaveHeight(first).toFixed(2)}m @${primaryPeriod(first).toFixed(1)}s`,
+    `⚡  ${first.energy.toFixed(0)}`,
+    `💨 ${Math.round(first.wind.speed)} km/h ${degreesToCardinal(first.wind.angle)} ${windArrowFromDegrees(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)`,
+    ...(hourlyTable
+      ? [hourlyTable]
+      : []),
   ].join('\n')
 }

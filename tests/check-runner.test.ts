@@ -109,8 +109,10 @@ test('runChecksWithDeps envía mensaje cuando hay ventana consecutiva válida', 
 
   assert.equal(sent.length, 1)
   assert.equal(touched.length, 1)
-  assert.match(sent[0], /📅 Fecha:/)
-  assert.match(sent[0], /Bajamar más cercana/)
+  assert.match(sent[0], /📍 sopelana/)
+  assert.match(sent[0], /📅 .*/)
+  assert.match(sent[0], /⏰ 10:00-12:00/)
+  assert.match(sent[0], /Marea baja/)
 })
 
 test('runChecksWithDeps no envía si no se cumple consecutividad mínima', async () => {
