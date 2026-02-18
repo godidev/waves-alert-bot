@@ -8,7 +8,7 @@ import {
   WIND_SECTORS,
 } from './bot-options.js'
 import { nextId } from './utils.js'
-import type { AlertRule, SurfForecast, WindRange } from './types.js'
+import type { AlertRule, SurfForecast, Range } from './types.js'
 
 const MAX_CACHE_ENTRIES = 100
 const DEFAULT_FETCH_TIMEOUT_MS = 10_000
@@ -73,21 +73,21 @@ export function windSector(dir: string): [number, number] | null {
   return [sector.min, sector.max]
 }
 
-function toRanges(selected: string[], options: RangeOption[]): WindRange[] {
+function toRanges(selected: string[], options: RangeOption[]): Range[] {
   return selected
     .map((id) => options.find((o) => o.id === id))
     .filter((x): x is RangeOption => Boolean(x))
     .map((x) => ({ min: x.min, max: x.max }))
 }
 
-function envelope(ranges: WindRange[]): { min: number; max: number } {
+function envelope(ranges: Range[]): { min: number; max: number } {
   return {
     min: Math.min(...ranges.map((r) => r.min)),
     max: Math.max(...ranges.map((r) => r.max)),
   }
 }
 
-function envelopeWind(ranges: WindRange[]): { min: number; max: number } {
+function envelopeWind(ranges: Range[]): { min: number; max: number } {
   const boundaries = ranges.flatMap((r) => {
     if (r.min <= r.max) return [r.min, r.max]
     return [0, r.max, r.min, 360]
