@@ -2,7 +2,7 @@ import {
   buildAlertMessage,
   findNearestTides,
   firstConsecutiveWindow,
-  matches,
+  matchDetail,
   type CandidateMatch,
   type TideEvent,
 } from './alert-engine.js'
@@ -138,6 +138,7 @@ async function buildCandidateMatches(
   alert: AlertRule,
   matchesFound: SurfForecast[],
   deps: CheckRunnerDeps,
+  stats: CheckRunStats,
 ): Promise<CandidateMatch[]> {
   const out: CandidateMatch[] = []
 
@@ -146,7 +147,10 @@ async function buildCandidateMatches(
     if (Number.isNaN(targetDate.getTime())) continue
 
     const inLightWindow = await deps.isWithinAlertWindow(alert.spot, targetDate)
-    if (!inLightWindow) continue
+    if (!inLightWindow) {
+      stats.discardReasons.light++
+      continue
+    }
 
     const tidePortId = alert.tidePortId ?? '72'
     const yyyymmdd = deps.apiDateFromForecastDate(candidate.date)
@@ -154,12 +158,18 @@ async function buildCandidateMatches(
 
     if (alert.tidePreference === 'high') {
       const nearestHigh = findNearestHighTideTs(targetDate, tideEvents)
-      if (!nearestHigh) continue
+      if (!nearestHigh) {
+        stats.discardReasons.tide++
+        continue
+      }
 
       const start = nearestHigh - 3 * 60 * 60 * 1000
       const end = nearestHigh + 3 * 60 * 60 * 1000
       const ts = targetDate.getTime()
-      if (ts < start || ts > end) continue
+      if (ts < start || ts > end) {
+        stats.discardReasons.tide++
+        continue
+      }
     }
 
     let tideClass: 'low' | 'mid' | 'high' | null = null
@@ -176,8 +186,10 @@ async function buildCandidateMatches(
     }
 
     if (alert.tidePreference && alert.tidePreference !== 'any') {
-      if (!tideClass) continue
-      if (tideClass !== alert.tidePreference) continue
+      if (!tideClass || tideClass !== alert.tidePreference) {
+        stats.discardReasons.tide++
+        continue
+      }
     }
 
     out.push({ forecast: candidate, tideClass, tideHeight })
@@ -186,11 +198,22 @@ async function buildCandidateMatches(
   return out
 }
 
-interface CheckRunStats {
+export interface DiscardReasons {
+  wave: number
+  period: number
+  energy: number
+  wind: number
+  tide: number
+  light: number
+}
+
+export interface CheckRunStats {
   totalAlerts: number
   matched: number
   notified: number
+  errors: number
   spots: string[]
+  discardReasons: DiscardReasons
 }
 
 export async function runChecksWithDeps(
@@ -201,7 +224,16 @@ export async function runChecksWithDeps(
     totalAlerts: deps.alerts.length,
     matched: 0,
     notified: 0,
+    errors: 0,
     spots: [...new Set(deps.alerts.map((a) => a.spot))],
+    discardReasons: {
+      wave: 0,
+      period: 0,
+      energy: 0,
+      wind: 0,
+      tide: 0,
+      light: 0,
+    },
   }
 
   for (const alert of deps.alerts) {
@@ -209,7 +241,18 @@ export async function runChecksWithDeps(
       const forecasts = await deps.fetchForecasts(alert.spot)
       if (!forecasts.length) continue
 
-      const matchesFound = forecasts.filter((f) => matches(alert, f))
+      const matchesFound: typeof forecasts = []
+      for (const f of forecasts) {
+        const detail = matchDetail(alert, f)
+        if (detail.pass) {
+          matchesFound.push(f)
+        } else {
+          if (!detail.wave) stats.discardReasons.wave++
+          if (!detail.period) stats.discardReasons.period++
+          if (!detail.energy) stats.discardReasons.energy++
+          if (!detail.wind) stats.discardReasons.wind++
+        }
+      }
       if (!matchesFound.length) continue
 
       stats.matched++
@@ -218,6 +261,7 @@ export async function runChecksWithDeps(
         alert,
         matchesFound,
         deps,
+        stats,
       )
       if (!candidateMatches.length) continue
 
@@ -259,6 +303,7 @@ export async function runChecksWithDeps(
       stats.notified++
     } catch (err) {
       console.error(`check_alert_error alert=${alert.id}`, err)
+      stats.errors++
     }
   }
 
