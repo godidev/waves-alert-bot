@@ -69,6 +69,48 @@ test('storage: migrates legacy fields windMin/windMax and spot=sopela', async ()
     assert.equal(alert.tidePortId, '72')
     assert.equal(alert.tidePortName, 'Bermeo')
     assert.equal(alert.tidePreference, 'any')
+    assert.equal(alert.enabled, true)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+    delete process.env.ALERTS_DB_PATH
+  }
+})
+
+test('storage: setAlertEnabled pauses and resumes alerts', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'waves-alerts-storage-'))
+  try {
+    const dbPath = join(dir, 'alerts.json')
+    writeFileSync(
+      dbPath,
+      JSON.stringify({
+        alerts: [
+          {
+            id: 'a3',
+            chatId: 7,
+            name: 'toggle-me',
+            spot: 'sopelana',
+            waveMin: 1,
+            waveMax: 2,
+            energyMin: 800,
+            energyMax: 1500,
+            periodMin: 10,
+            periodMax: 12,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    )
+    process.env.ALERTS_DB_PATH = dbPath
+
+    const storage = await loadStorageModule()
+
+    assert.equal(storage.setAlertEnabled(7, 'a3', false), true)
+    assert.equal(storage.listAlerts(7)[0].enabled, false)
+
+    assert.equal(storage.setAlertEnabled(7, 'a3', true), true)
+    assert.equal(storage.listAlerts(7)[0].enabled, true)
+
+    assert.equal(storage.setAlertEnabled(7, 'missing', false), false)
   } finally {
     rmSync(dir, { recursive: true, force: true })
     delete process.env.ALERTS_DB_PATH

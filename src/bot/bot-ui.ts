@@ -91,6 +91,11 @@ export function confirmKeyboard(): InlineKeyboard {
     .text('❌ Cancelar', 'confirm:CANCEL')
 }
 
-export function alertActionsKeyboard(alertId: string): InlineKeyboard {
-  return new InlineKeyboard().text('🗑️ Borrar', `delalert:${alertId}`)
+export function alertActionsKeyboard(
+  alertId: string,
+  isEnabled: boolean,
+): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(isEnabled ? '⏸️ Pausar' : '▶️ Reanudar', `togglealert:${alertId}`)
+    .text('🗑️ Borrar', `delalert:${alertId}`)
 }

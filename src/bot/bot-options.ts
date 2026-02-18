@@ -85,12 +85,14 @@ export interface DraftAlert {
 }
 
 export const COMMANDS_HELP =
-  'Comandos:\n/setalert - crear alerta guiada\n/listalerts - listar alertas\n/deletealert <id> - borrar alerta\n/cancel - cancelar flujo actual\n/help - ver comandos'
+  'Comandos:\n/setalert - crear alerta guiada\n/listalerts - listar alertas\n/pausealert <id> - pausar alerta\n/resumealert <id> - reanudar alerta\n/deletealert <id> - borrar alerta\n/cancel - cancelar flujo actual\n/help - ver comandos'
 
 export const BOT_COMMANDS = [
   { command: 'start', description: 'Iniciar bot y ver ayuda' },
   { command: 'setalert', description: 'Crear alerta guiada' },
   { command: 'listalerts', description: 'Ver tus alertas' },
+  { command: 'pausealert', description: 'Pausar alerta por ID' },
+  { command: 'resumealert', description: 'Reanudar alerta por ID' },
   { command: 'deletealert', description: 'Borrar alerta por ID' },
   { command: 'cancel', description: 'Cancelar flujo de creación' },
   { command: 'help', description: 'Mostrar comandos disponibles' },

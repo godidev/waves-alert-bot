@@ -147,6 +147,7 @@ export function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
       TIDE_PORT_OPTIONS.find((p) => p.id === (d.tidePortId ?? '72'))?.label ??
       'Bermeo',
     tidePreference: d.tidePreference ?? 'any',
+    enabled: true,
     createdAt: new Date().toISOString(),
   }
 }

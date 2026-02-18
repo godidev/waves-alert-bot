@@ -235,6 +235,8 @@ export async function runChecksWithDeps(
 
   for (const alert of deps.alerts) {
     try {
+      if (alert.enabled === false) continue
+
       let forecasts = forecastsBySpot.get(alert.spot)
       if (!forecasts) {
         forecasts = await deps.fetchForecasts(alert.spot)

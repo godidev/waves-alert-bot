@@ -25,6 +25,7 @@ export interface AlertRule {
   tidePortId?: string
   tidePortName?: string
   tidePreference?: 'low' | 'mid' | 'high' | 'any'
+  enabled?: boolean
   lastNotifiedAt?: string
   createdAt: string
 }

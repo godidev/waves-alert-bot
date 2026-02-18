@@ -5,6 +5,7 @@ import {
   insertAlert,
   listAlerts,
   listAllAlerts,
+  setAlertEnabled,
   touchAlertNotified,
 } from './infra/storage.js'
 import { runChecksWithDeps, type AlertWindow } from './core/check-runner.js'
@@ -234,6 +235,34 @@ bot.on('callback_query:data', async (ctx) => {
       } catch {
         // noop
       }
+    }
+    return
+  }
+
+  if (prefix === 'togglealert') {
+    if (!value) {
+      await ctx.answerCallbackQuery({ text: 'ID de alerta inválido' })
+      return
+    }
+
+    const target = listAlerts(chatId).find((a) => a.id === value)
+    if (!target) {
+      await ctx.answerCallbackQuery({ text: 'No encontré esa alerta' })
+      return
+    }
+
+    const nextEnabled = target.enabled === false
+    const updated = setAlertEnabled(chatId, value, nextEnabled)
+    await ctx.answerCallbackQuery({
+      text: updated
+        ? nextEnabled
+          ? '▶️ Alerta reanudada'
+          : '⏸️ Alerta pausada'
+        : 'No pude actualizar la alerta',
+    })
+
+    if (updated) {
+      await safeEditReplyMarkup(ctx, alertActionsKeyboard(value, nextEnabled))
     }
     return
   }
@@ -564,6 +593,7 @@ bot.command('alerts_all', async (ctx) => {
     const period = formatCompactRange(a.periodMin, a.periodMax, 16)
     const wind = a.windLabels?.join(', ') ?? 'ANY'
     const tide = `${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`
+    const status = a.enabled === false ? 'pausada' : 'activa'
     const notified = a.lastNotifiedAt
       ? a.lastNotifiedAt.replace('T', ' ').slice(0, 19)
       : 'nunca'
@@ -574,6 +604,7 @@ bot.command('alerts_all', async (ctx) => {
       `spot: ${a.spot}`,
       `olas: ${wave} | energia: ${energy} | periodo: ${period}`,
       `viento: ${wind} | marea: ${tide}`,
+      `estado: ${status}`,
       `última notificación: ${notified}`,
     ].join('\n')
   })
@@ -614,12 +645,59 @@ bot.command('listalerts', async (ctx) => {
       `Periodo: ${period}`,
       `Viento: ${wind}`,
       `Marea: ${tide}`,
+      `Estado: ${status}`,
     ].join('\n')
 
     await ctx.reply(block, {
-      reply_markup: alertActionsKeyboard(a.id),
+      reply_markup: alertActionsKeyboard(a.id, a.enabled !== false),
     })
   }
+})
+
+bot.command('pausealert', async (ctx) => {
+  const id = (ctx.message?.text ?? '').split(' ')[1]?.trim()
+  if (!id) {
+    await ctx.reply('Uso: /pausealert <id>')
+    return
+  }
+
+  const target = listAlerts(ctx.chat.id).find((a) => a.id === id)
+  if (!target) {
+    await ctx.reply('No encontré esa alerta')
+    return
+  }
+
+  if (target.enabled === false) {
+    await ctx.reply('⏸️ Esa alerta ya está pausada')
+    return
+  }
+
+  const updated = setAlertEnabled(ctx.chat.id, id, false)
+  await ctx.reply(updated ? '⏸️ Alerta pausada' : 'No pude pausar la alerta')
+})
+
+bot.command('resumealert', async (ctx) => {
+  const id = (ctx.message?.text ?? '').split(' ')[1]?.trim()
+  if (!id) {
+    await ctx.reply('Uso: /resumealert <id>')
+    return
+  }
+
+  const target = listAlerts(ctx.chat.id).find((a) => a.id === id)
+  if (!target) {
+    await ctx.reply('No encontré esa alerta')
+    return
+  }
+
+  if (target.enabled !== false) {
+    await ctx.reply('▶️ Esa alerta ya está activa')
+    return
+  }
+
+  const updated = setAlertEnabled(ctx.chat.id, id, true)
+  await ctx.reply(
+    updated ? '▶️ Alerta reanudada' : 'No pude reanudar la alerta',
+  )
 })
 
 bot.command('deletealert', async (ctx) => {

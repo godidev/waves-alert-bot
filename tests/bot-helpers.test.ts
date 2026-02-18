@@ -38,6 +38,7 @@ test('draftToAlert usa envolvente min/max de todas las opciones seleccionadas', 
   assert.equal(alert.waveRanges, undefined)
   assert.equal(alert.periodRanges, undefined)
   assert.deepEqual(alert.windRanges, [{ min: 22.5, max: 112.5 }])
+  assert.equal(alert.enabled, true)
 })
 
 test('draftToAlert devuelve null si falta una selección requerida', () => {

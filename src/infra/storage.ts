@@ -86,6 +86,7 @@ function migrateAlert(rawAlert: unknown): AlertRule {
   if (!alert.tidePortId) alert.tidePortId = '72'
   if (!alert.tidePortName) alert.tidePortName = 'Bermeo'
   if (!alert.tidePreference) alert.tidePreference = 'any'
+  if (alert.enabled == null) alert.enabled = true
 
   delete alert.waveRanges
   delete alert.periodRanges
@@ -158,6 +159,19 @@ export function deleteAlert(chatId: number, id: string): boolean {
   db.alerts = db.alerts.filter((a) => !(a.chatId === chatId && a.id === id))
   writeDb(db)
   return db.alerts.length < lenBefore
+}
+
+export function setAlertEnabled(
+  chatId: number,
+  id: string,
+  enabled: boolean,
+): boolean {
+  const db = readDb()
+  const target = db.alerts.find((a) => a.chatId === chatId && a.id === id)
+  if (!target) return false
+  target.enabled = enabled
+  writeDb(db)
+  return true
 }
 
 export function listAllAlerts(): AlertRule[] {
