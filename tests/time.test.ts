@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseMadridLocalDateTime } from '../src/time.js'
+import { parseMadridLocalDateTime } from '../src/core/time.js'
 
 test('parseMadridLocalDateTime convierte hora local de invierno a UTC', () => {
   const parsed = parseMadridLocalDateTime('2026-01-15', '12:00')

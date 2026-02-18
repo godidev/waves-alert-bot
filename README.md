@@ -19,6 +19,12 @@ npm run check
 npm start
 ```
 
+## Estructura de `src`
+- `src/index.ts`: entrada principal del bot.
+- `src/core/`: lógica de dominio (matching, scheduler, utilidades de tiempo/tipos).
+- `src/bot/`: flujo guiado, teclados y helpers de interacción/API.
+- `src/infra/`: persistencia JSON y logging de ejecuciones.
+
 ## Comandos
 - `/start`
 - `/setalert` (modo guiado paso a paso)

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { msUntilNextMadridHourMinute } from '../src/scheduler.js'
+import { msUntilNextMadridHourMinute } from '../src/core/scheduler.js'
 
 test('scheduler calcula próximo HH:10 si ya pasó el minuto', () => {
   const now = new Date('2026-02-15T19:28:00+01:00')

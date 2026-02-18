@@ -6,11 +6,11 @@ import {
   listAlerts,
   listAllAlerts,
   touchAlertNotified,
-} from './storage.js'
-import { runChecksWithDeps, type AlertWindow } from './check-runner.js'
-import { appendCheckLog } from './check-logger.js'
-import { startHourlySchedulerAtMinute } from './scheduler.js'
-import { buildCleanupDeleteList } from './flow-cleanup.js'
+} from './infra/storage.js'
+import { runChecksWithDeps, type AlertWindow } from './core/check-runner.js'
+import { appendCheckLog } from './infra/check-logger.js'
+import { startHourlySchedulerAtMinute } from './core/scheduler.js'
+import { buildCleanupDeleteList } from './bot/flow-cleanup.js'
 import {
   BOT_COMMANDS,
   COMMANDS_HELP,
@@ -21,7 +21,7 @@ import {
   TIDE_PREF_OPTIONS,
   WAVE_OPTIONS,
   type DraftAlert,
-} from './bot-options.js'
+} from './bot/bot-options.js'
 import {
   confirmKeyboard,
   keyboardFromOptions,
@@ -29,7 +29,7 @@ import {
   tidePortKeyboard,
   tidePreferenceKeyboard,
   windKeyboard,
-} from './bot-ui.js'
+} from './bot/bot-ui.js'
 import {
   alertSummaryText,
   apiDateFromForecastDate,
@@ -40,7 +40,7 @@ import {
   tideTag,
   toggle,
   windSector,
-} from './bot-helpers.js'
+} from './bot/bot-helpers.js'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL =
@@ -214,7 +214,11 @@ bot.on('callback_query:data', async (ctx) => {
       d.step = 'energy'
       await ctx.answerCallbackQuery({ text: 'OK' })
       await flowReply(ctx, d, 'Elige uno o varios rangos de energía:', {
-        reply_markup: keyboardFromOptions('energy', ENERGY_OPTIONS, d.energySelected),
+        reply_markup: keyboardFromOptions(
+          'energy',
+          ENERGY_OPTIONS,
+          d.energySelected,
+        ),
       })
       return
     }
@@ -233,7 +237,9 @@ bot.on('callback_query:data', async (ctx) => {
   if (prefix === 'energy') {
     if (value === 'DONE') {
       if (!d.energySelected.length) {
-        await ctx.answerCallbackQuery({ text: 'Elige al menos un rango de energía' })
+        await ctx.answerCallbackQuery({
+          text: 'Elige al menos un rango de energía',
+        })
         return
       }
       d.step = 'period'

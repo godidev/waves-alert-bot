@@ -22,18 +22,22 @@ Guía operativa rápida para trabajar en este repo.
 ## Estructura del proyecto
 ```
 src/
-  index.ts          — entrada principal, setup del bot, handlers, scheduler
-  types.ts          — tipos core (AlertRule, SurfForecast, WindRange)
-  utils.ts          — funciones puras (totalWaveHeight, degreesToCardinal, normalizeAngle, nextId)
-  alert-engine.ts   — matching de alertas, ventanas consecutivas, mareas, mensaje de alerta
-  check-runner.ts   — orquestación: matching + dedupe + envío
-  scheduler.ts      — scheduler horario (:10 Europe/Madrid)
-  storage.ts        — persistencia JSON con migración
-  flow-cleanup.ts   — limpieza de mensajes del wizard
-  bot-options.ts    — constantes y tipos del wizard (opciones, DraftAlert)
-  bot-ui.ts         — constructores de InlineKeyboard
-  bot-helpers.ts    — helpers de negocio (API, caches, conversión draft→alert)
-  check-logger.ts   — log de cada check run (últimas 48h, persistido en JSON)
+  index.ts              — entrada principal, setup del bot, handlers, scheduler
+  core/
+    types.ts            — tipos core (AlertRule, SurfForecast, WindRange)
+    utils.ts            — funciones puras (totalWaveHeight, degreesToCardinal, normalizeAngle, nextId)
+    time.ts             — utilidades de fecha/hora Europe/Madrid
+    scheduler.ts        — scheduler horario (:10 Europe/Madrid)
+    alert-engine.ts     — matching de alertas, ventanas consecutivas, mareas, mensaje de alerta
+    check-runner.ts     — orquestación: matching + dedupe + envío
+  bot/
+    bot-options.ts      — constantes y tipos del wizard (opciones, DraftAlert)
+    bot-ui.ts           — constructores de InlineKeyboard
+    bot-helpers.ts      — helpers de negocio (API, caches, conversión draft→alert)
+    flow-cleanup.ts     — limpieza de mensajes del wizard
+  infra/
+    storage.ts          — persistencia JSON con migración
+    check-logger.ts     — log de cada check run (últimas 48h, persistido en JSON)
 tests/
   *.test.ts         — tests unitarios (imports desde ../src/)
 data/
@@ -76,11 +80,11 @@ data/
 4. Confirmar que el cambio está aislado y con commit propio.
 
 ## Áreas sensibles
-- `src/check-runner.ts`: matching, dedupe y decisión de envío.
-- `src/scheduler.ts`: timing de ejecución (HH:10 Europe/Madrid).
+- `src/core/check-runner.ts`: matching, dedupe y decisión de envío.
+- `src/core/scheduler.ts`: timing de ejecución (HH:10 Europe/Madrid).
 - `src/index.ts`: integración bot/flujo de creación.
-- `src/storage.ts`: persistencia de alertas (migración de formato legacy).
-- `src/alert-engine.ts`: lógica de matching y construcción de mensajes.
+- `src/infra/storage.ts`: persistencia de alertas (migración de formato legacy).
+- `src/core/alert-engine.ts`: lógica de matching y construcción de mensajes.
 
 ## Variables de entorno
 | Variable                | Requerida | Descripción                                |

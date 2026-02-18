@@ -4,8 +4,8 @@ import {
   draftToAlert,
   fetchForecasts,
   getTideEventsForDate,
-} from '../src/bot-helpers.js'
-import type { DraftAlert } from '../src/bot-options.js'
+} from '../src/bot/bot-helpers.js'
+import type { DraftAlert } from '../src/bot/bot-options.js'
 
 function mkDraft(overrides: Partial<DraftAlert> = {}): DraftAlert {
   return {
@@ -61,7 +61,10 @@ test('fetchForecasts usa signal y degrada a [] cuando fetch falla', async () => 
   }) as typeof fetch
 
   try {
-    const forecasts = await fetchForecasts('https://backend.invalid', 'sopelana')
+    const forecasts = await fetchForecasts(
+      'https://backend.invalid',
+      'sopelana',
+    )
     assert.deepEqual(forecasts, [])
     assert.equal(signalSeen, true)
   } finally {

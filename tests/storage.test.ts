@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 function loadStorageModule() {
-  return import(`../src/storage.ts?t=${Date.now()}-${Math.random()}`)
+  return import(`../src/infra/storage.ts?t=${Date.now()}-${Math.random()}`)
 }
 
 test('storage: recovers from corrupted JSON by resetting DB and creating backup', async () => {

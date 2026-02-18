@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import type { AlertRule } from './types.js'
+import type { AlertRule } from '../core/types.js'
 
 const DB_PATH = process.env.ALERTS_DB_PATH ?? './data/alerts.json'
 

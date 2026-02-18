@@ -1,4 +1,4 @@
-import type { AlertRule } from './types.js'
+import type { AlertRule } from '../core/types.js'
 
 export const DEFAULT_SPOT = 'sopelana'
 

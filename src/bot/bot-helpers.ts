@@ -1,4 +1,4 @@
-import type { TideEvent } from './alert-engine.js'
+import type { TideEvent } from '../core/alert-engine.js'
 import type { DraftAlert, RangeOption } from './bot-options.js'
 import {
   ENERGY_OPTIONS,
@@ -7,8 +7,8 @@ import {
   WAVE_OPTIONS,
   WIND_SECTORS,
 } from './bot-options.js'
-import { nextId } from './utils.js'
-import type { AlertRule, SurfForecast, Range } from './types.js'
+import { nextId } from '../core/utils.js'
+import type { AlertRule, SurfForecast, Range } from '../core/types.js'
 
 const MAX_CACHE_ENTRIES = 100
 const DEFAULT_FETCH_TIMEOUT_MS = 10_000
@@ -53,7 +53,11 @@ function fmtRangeNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
-function formatCompactRange(min: number, max: number, openStart?: number): string {
+function formatCompactRange(
+  min: number,
+  max: number,
+  openStart?: number,
+): string {
   if (openStart == null || max < openStart) {
     return `${fmtRangeNumber(min)}-${fmtRangeNumber(max)}`
   }

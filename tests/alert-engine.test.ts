@@ -5,8 +5,8 @@ import {
   findNearestTides,
   firstConsecutiveWindow,
   matches,
-} from '../src/alert-engine.js'
-import type { AlertRule, SurfForecast } from '../src/types.js'
+} from '../src/core/alert-engine.js'
+import type { AlertRule, SurfForecast } from '../src/core/types.js'
 
 function mkForecast(
   date: string,
