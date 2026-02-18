@@ -470,13 +470,13 @@ bot.command('status', async (ctx) => {
     `Último check: ${fmtDate(last.timestamp)} — ${last.durationMs}ms`,
     `Matched: ${last.matched} | Enviadas: ${last.notified}`,
     '',
-    `Motivos (${d.light + d.wave + d.period + d.energy + d.wind + last.passAll}h):`,
+    'Motivos:',
+    `  - luz: ${d.light}h ❌`,
     `  - viento: ${d.wind}h ❌`,
     `  - periodo: ${d.period}h ❌`,
     `  - ola: ${d.wave}h ❌`,
     `  - energía: ${d.energy}h ❌`,
     `  - marea: ${d.tide}h ❌`,
-    `  - luz: ${d.light}h ❌`,
     `Horas que cumplen todo: ${last.passAll}h ✅`,
   ]
 

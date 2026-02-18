@@ -253,14 +253,11 @@ export async function runChecksWithDeps(
         if (detail.pass) {
           matchesFound.push(f)
           stats.passAll++
-        } else if (!detail.wave) {
-          stats.discardReasons.wave++
-        } else if (!detail.period) {
-          stats.discardReasons.period++
-        } else if (!detail.energy) {
-          stats.discardReasons.energy++
-        } else if (!detail.wind) {
-          stats.discardReasons.wind++
+        } else {
+          if (!detail.wave) stats.discardReasons.wave++
+          if (!detail.period) stats.discardReasons.period++
+          if (!detail.energy) stats.discardReasons.energy++
+          if (!detail.wind) stats.discardReasons.wind++
         }
       }
       if (!matchesFound.length) continue
