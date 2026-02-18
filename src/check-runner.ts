@@ -14,7 +14,7 @@ export interface AlertWindow {
   endMs: number
 }
 
-export interface CheckRunnerDeps {
+interface CheckRunnerDeps {
   alerts: AlertRule[]
   minConsecutiveHours: number
   fetchForecasts: (spot: string) => Promise<SurfForecast[]>
@@ -107,7 +107,7 @@ function findNearestHighTideTs(
   return best
 }
 
-export function buildAlertProfileKey(alert: AlertRule): string {
+function buildAlertProfileKey(alert: AlertRule): string {
   return JSON.stringify({
     waveRanges: alert.waveRanges,
     periodRanges: alert.periodRanges,
@@ -186,7 +186,7 @@ async function buildCandidateMatches(
   return out
 }
 
-export interface CheckRunStats {
+interface CheckRunStats {
   totalAlerts: number
   matched: number
   notified: number

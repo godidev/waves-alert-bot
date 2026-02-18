@@ -4,7 +4,7 @@ import { dirname } from 'node:path'
 const LOG_PATH = process.env.CHECK_LOG_PATH ?? './data/check-log.json'
 const MAX_ENTRIES = 48
 
-export interface CheckLogEntry {
+interface CheckLogEntry {
   timestamp: string
   totalAlerts: number
   matched: number
@@ -39,8 +39,4 @@ export function appendCheckLog(entry: CheckLogEntry): void {
   const pruned = entries.slice(-MAX_ENTRIES)
   ensureLogFile()
   writeFileSync(LOG_PATH, JSON.stringify(pruned, null, 2))
-}
-
-export function getCheckLog(): CheckLogEntry[] {
-  return readLog()
 }
