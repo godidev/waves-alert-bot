@@ -183,3 +183,30 @@ test('runChecksWithDeps marea alta interpreta horas de marea en UTC', async () =
   // El forecast 16:00Z queda fuera.
   assert.equal(sent, 0)
 })
+
+test('runChecksWithDeps cachea forecasts por spot en cada ejecución', async () => {
+  let fetchCalls = 0
+  let sent = 0
+
+  await runChecksWithDeps({
+    alerts: [
+      mkAlert({ id: 'alert-1', chatId: 123, spot: 'sopelana' }),
+      mkAlert({ id: 'alert-2', chatId: 456, spot: 'sopelana' }),
+    ],
+    minConsecutiveHours: 1,
+    fetchForecasts: async () => {
+      fetchCalls++
+      return [mkForecast('2026-02-16T09:00:00.000Z')]
+    },
+    isWithinAlertWindow: async () => true,
+    getTideEventsForDate: async () => mkTides(),
+    apiDateFromForecastDate: () => '20260216',
+    sendMessage: async () => {
+      sent++
+    },
+    touchAlertNotified: () => undefined,
+  })
+
+  assert.equal(fetchCalls, 1)
+  assert.equal(sent, 2)
+})

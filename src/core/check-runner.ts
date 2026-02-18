@@ -215,6 +215,7 @@ export async function runChecksWithDeps(
   deps: CheckRunnerDeps,
 ): Promise<CheckRunStats> {
   const now = deps.nowMs ?? (() => Date.now())
+  const forecastsBySpot = new Map<string, SurfForecast[]>()
   const stats: CheckRunStats = {
     totalAlerts: deps.alerts.length,
     matched: 0,
@@ -234,7 +235,11 @@ export async function runChecksWithDeps(
 
   for (const alert of deps.alerts) {
     try {
-      const forecasts = await deps.fetchForecasts(alert.spot)
+      let forecasts = forecastsBySpot.get(alert.spot)
+      if (!forecasts) {
+        forecasts = await deps.fetchForecasts(alert.spot)
+        forecastsBySpot.set(alert.spot, forecasts)
+      }
       if (!forecasts.length) continue
 
       const matchesFound: typeof forecasts = []
