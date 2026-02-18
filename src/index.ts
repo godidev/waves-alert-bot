@@ -428,14 +428,27 @@ bot.command('status', async (ctx) => {
   const uptimeH = Math.floor(uptimeMs / 3_600_000)
   const uptimeM = Math.floor((uptimeMs % 3_600_000) / 60_000)
 
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleString('es-ES', {
+      timeZone: 'Europe/Madrid',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+
+  const lastCheckLine = last
+    ? `${fmtDate(last.timestamp)} (${last.durationMs}ms) — matched: ${last.matched}, enviadas: ${last.notified}`
+    : 'sin datos'
+
   const lines = [
     '--- Bot Status ---',
     `Uptime: ${uptimeH}h ${uptimeM}m`,
     `Alertas totales: ${allAlerts.length}`,
     `Spots activos: ${spots.length ? spots.join(', ') : 'ninguno'}`,
-    `Entradas dedupe: ${lastSentWindows.size}`,
-    `Último check: ${last ? `${last.timestamp} (${last.durationMs}ms, matched=${last.matched}, notified=${last.notified})` : 'sin datos'}`,
-    `Check log entries: ${log.length}/48`,
+    `Alertas con envío reciente: ${lastSentWindows.size}`,
+    `Último check: ${lastCheckLine}`,
+    `Historial checks: ${log.length}/48`,
   ]
 
   await ctx.reply(lines.join('\n'))
@@ -451,9 +464,16 @@ bot.command('checklog', async (ctx) => {
   }
 
   const recent = log.slice(-10)
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleString('es-ES', {
+      timeZone: 'Europe/Madrid',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   const lines = recent.map((e) => {
-    const t = e.timestamp.replace('T', ' ').slice(0, 19)
-    return `${t} | ${e.durationMs}ms | alerts=${e.totalAlerts} matched=${e.matched} sent=${e.notified}`
+    return `${fmtDate(e.timestamp)} | ${e.durationMs}ms | alertas=${e.totalAlerts} matched=${e.matched} enviadas=${e.notified}`
   })
 
   await ctx.reply(
