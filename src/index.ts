@@ -407,6 +407,109 @@ bot.on('callback_query:data', async (ctx) => {
   }
 })
 
+/* ─── Dev-only commands (hidden, guarded by DEV_CHAT_ID) ─── */
+
+bot.command('status', async (ctx) => {
+  if (!isDevChat(ctx.chat.id)) return
+
+  const allAlerts = listAllAlerts()
+  const spots = [...new Set(allAlerts.map((a) => a.spot))]
+  const log = readLog()
+  const last = log.at(-1)
+  const uptimeMs = Date.now() - startedAt
+  const uptimeH = Math.floor(uptimeMs / 3_600_000)
+  const uptimeM = Math.floor((uptimeMs % 3_600_000) / 60_000)
+
+  const lines = [
+    '--- Bot Status ---',
+    `Uptime: ${uptimeH}h ${uptimeM}m`,
+    `Alertas totales: ${allAlerts.length}`,
+    `Spots activos: ${spots.length ? spots.join(', ') : 'ninguno'}`,
+    `Entradas dedupe: ${lastSentWindows.size}`,
+    `Último check: ${last ? `${last.timestamp} (${last.durationMs}ms, matched=${last.matched}, notified=${last.notified})` : 'sin datos'}`,
+    `Check log entries: ${log.length}/48`,
+  ]
+
+  await ctx.reply(lines.join('\n'))
+})
+
+bot.command('checklog', async (ctx) => {
+  if (!isDevChat(ctx.chat.id)) return
+
+  const log = readLog()
+  if (!log.length) {
+    await ctx.reply('Check log vacío.')
+    return
+  }
+
+  const recent = log.slice(-10)
+  const lines = recent.map((e) => {
+    const t = e.timestamp.replace('T', ' ').slice(0, 19)
+    return `${t} | ${e.durationMs}ms | alerts=${e.totalAlerts} matched=${e.matched} sent=${e.notified}`
+  })
+
+  await ctx.reply(
+    `--- Últimos ${recent.length} checks ---\n\n${lines.join('\n')}`,
+  )
+})
+
+bot.command('runnow', async (ctx) => {
+  if (!isDevChat(ctx.chat.id)) return
+
+  await ctx.reply('Ejecutando check run...')
+  try {
+    await runChecks()
+    const last = readLog().at(-1)
+    await ctx.reply(
+      last
+        ? `Check completado en ${last.durationMs}ms\nmatched=${last.matched} notified=${last.notified}`
+        : 'Check completado (sin datos de log)',
+    )
+  } catch (err) {
+    await ctx.reply(`Error en check run: ${String(err)}`)
+  }
+})
+
+bot.command('alerts_all', async (ctx) => {
+  if (!isDevChat(ctx.chat.id)) return
+
+  const allAlerts = listAllAlerts()
+  if (!allAlerts.length) {
+    await ctx.reply('No hay alertas registradas.')
+    return
+  }
+
+  const blocks = allAlerts.map((a) => {
+    const wave = `${fmtRangeNumber(a.waveMin)}-${fmtRangeNumber(a.waveMax)}`
+    const energy = formatCompactRange(a.energyMin, a.energyMax, 4000)
+    const period = formatCompactRange(a.periodMin, a.periodMax, 16)
+    const wind = a.windLabels?.join(', ') ?? 'ANY'
+    const tide = `${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`
+    const notified = a.lastNotifiedAt
+      ? a.lastNotifiedAt.replace('T', ' ').slice(0, 19)
+      : 'nunca'
+
+    return [
+      `${a.name} [${a.id}]`,
+      `chatId: ${a.chatId}`,
+      `spot: ${a.spot}`,
+      `olas: ${wave} | energia: ${energy} | periodo: ${period}`,
+      `viento: ${wind} | marea: ${tide}`,
+      `última notificación: ${notified}`,
+    ].join('\n')
+  })
+
+  const msg = `--- Todas las alertas (${allAlerts.length}) ---\n\n${blocks.join('\n\n────────\n\n')}`
+  // Telegram max message length is 4096; split if needed
+  if (msg.length <= 4096) {
+    await ctx.reply(msg)
+  } else {
+    for (let i = 0; i < msg.length; i += 4096) {
+      await ctx.reply(msg.slice(i, i + 4096))
+    }
+  }
+})
+
 bot.command('listalerts', async (ctx) => {
   const alerts = listAlerts(ctx.chat.id)
   if (!alerts.length) {
