@@ -43,6 +43,7 @@ import {
   toggle,
   windSector,
 } from './bot/bot-helpers.js'
+import type { AlertRule } from './core/types.js'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL =
@@ -155,6 +156,27 @@ function formatCompactRange(
   return `${fmtRangeNumber(min)}-${fmtRangeNumber(openStart)}+`
 }
 
+function listAlertBlock(a: AlertRule, idx: number): string {
+  const wave = `${fmtRangeNumber(a.waveMin)}-${fmtRangeNumber(a.waveMax)}`
+  const energy = formatCompactRange(a.energyMin, a.energyMax, 4000)
+  const period = formatCompactRange(a.periodMin, a.periodMax, 16)
+  const wind = a.windLabels?.join(', ') ?? 'ANY'
+  const tide = `${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`
+  const status = a.enabled === false ? 'pausada' : 'activa'
+
+  return [
+    `#${idx + 1} · ${a.name}`,
+    `ID: ${a.id}`,
+    `Spot: ${a.spot}`,
+    `Olas: ${wave}`,
+    `Energía: ${energy}`,
+    `Periodo: ${period}`,
+    `Viento: ${wind}`,
+    `Marea: ${tide}`,
+    `Estado: ${status}`,
+  ].join('\n')
+}
+
 bot.command('start', async (ctx) => {
   await ctx.reply(`Bot listo.\n\n${COMMANDS_HELP}`)
 })
@@ -231,7 +253,7 @@ bot.on('callback_query:data', async (ctx) => {
 
     if (deleted) {
       try {
-        await ctx.editMessageReplyMarkup({ reply_markup: undefined })
+        await ctx.deleteMessage()
       } catch {
         // noop
       }
@@ -262,7 +284,25 @@ bot.on('callback_query:data', async (ctx) => {
     })
 
     if (updated) {
-      await safeEditReplyMarkup(ctx, alertActionsKeyboard(value, nextEnabled))
+      const updatedAlerts = listAlerts(chatId)
+      const alertIdx = updatedAlerts.findIndex((a) => a.id === value)
+      const updatedAlert = alertIdx >= 0 ? updatedAlerts[alertIdx] : null
+
+      if (updatedAlert) {
+        try {
+          await ctx.editMessageText(listAlertBlock(updatedAlert, alertIdx), {
+            reply_markup: alertActionsKeyboard(
+              updatedAlert.id,
+              updatedAlert.enabled !== false,
+            ),
+          })
+        } catch {
+          await safeEditReplyMarkup(
+            ctx,
+            alertActionsKeyboard(value, nextEnabled),
+          )
+        }
+      }
     }
     return
   }
@@ -630,26 +670,7 @@ bot.command('listalerts', async (ctx) => {
   await ctx.reply(`📋 Tus alertas (${alerts.length})`)
 
   for (const [idx, a] of alerts.entries()) {
-    const wave = `${fmtRangeNumber(a.waveMin)}-${fmtRangeNumber(a.waveMax)}`
-    const energy = formatCompactRange(a.energyMin, a.energyMax, 4000)
-    const period = formatCompactRange(a.periodMin, a.periodMax, 16)
-    const wind = a.windLabels?.join(', ') ?? 'ANY'
-    const tide = `${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`
-    const status = a.enabled === false ? 'pausada' : 'activa'
-
-    const block = [
-      `#${idx + 1} · ${a.name}`,
-      `ID: ${a.id}`,
-      `Spot: ${a.spot}`,
-      `Olas: ${wave}`,
-      `Energía: ${energy}`,
-      `Periodo: ${period}`,
-      `Viento: ${wind}`,
-      `Marea: ${tide}`,
-      `Estado: ${status}`,
-    ].join('\n')
-
-    await ctx.reply(block, {
+    await ctx.reply(listAlertBlock(a, idx), {
       reply_markup: alertActionsKeyboard(a.id, a.enabled !== false),
     })
   }
