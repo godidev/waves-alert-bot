@@ -1,4 +1,4 @@
-export interface WindRange {
+export interface Range {
   min: number
   max: number
 }
@@ -14,9 +14,9 @@ export interface AlertRule {
   energyMax: number
   periodMin: number
   periodMax: number
-  waveRanges?: WindRange[]
-  periodRanges?: WindRange[]
-  windRanges?: WindRange[]
+  waveRanges?: Range[]
+  periodRanges?: Range[]
+  windRanges?: Range[]
   waveLabels?: string[]
   periodLabels?: string[]
   windLabels?: string[]
