@@ -146,12 +146,6 @@ async function buildCandidateMatches(
     const targetDate = new Date(candidate.date)
     if (Number.isNaN(targetDate.getTime())) continue
 
-    const inLightWindow = await deps.isWithinAlertWindow(alert.spot, targetDate)
-    if (!inLightWindow) {
-      stats.discardReasons.light++
-      continue
-    }
-
     const tidePortId = alert.tidePortId ?? '72'
     const yyyymmdd = deps.apiDateFromForecastDate(candidate.date)
     const tideEvents = await deps.getTideEventsForDate(tidePortId, yyyymmdd)
@@ -243,6 +237,16 @@ export async function runChecksWithDeps(
 
       const matchesFound: typeof forecasts = []
       for (const f of forecasts) {
+        const forecastDate = new Date(f.date)
+        if (Number.isNaN(forecastDate.getTime())) continue
+
+        // Light filter first: skip nighttime hours before evaluating conditions
+        const inLight = await deps.isWithinAlertWindow(alert.spot, forecastDate)
+        if (!inLight) {
+          stats.discardReasons.light++
+          continue
+        }
+
         const detail = matchDetail(alert, f)
         if (detail.pass) {
           matchesFound.push(f)
