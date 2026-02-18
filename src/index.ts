@@ -23,6 +23,7 @@ import {
   type DraftAlert,
 } from './bot/bot-options.js'
 import {
+  alertActionsKeyboard,
   confirmKeyboard,
   keyboardFromOptions,
   safeEditReplyMarkup,
@@ -215,6 +216,27 @@ bot.on('callback_query:data', async (ctx) => {
   const [prefix, value] = data.split(':')
   const chatId = ctx.chat?.id
   if (!chatId) return
+
+  if (prefix === 'delalert') {
+    if (!value) {
+      await ctx.answerCallbackQuery({ text: 'ID de alerta inválido' })
+      return
+    }
+
+    const deleted = deleteAlert(chatId, value)
+    await ctx.answerCallbackQuery({
+      text: deleted ? '🗑️ Alerta borrada' : 'No encontré esa alerta',
+    })
+
+    if (deleted) {
+      try {
+        await ctx.editMessageReplyMarkup({ reply_markup: undefined })
+      } catch {
+        // noop
+      }
+    }
+    return
+  }
 
   const d = drafts.get(chatId)
   if (!d) {
@@ -574,14 +596,16 @@ bot.command('listalerts', async (ctx) => {
     return
   }
 
-  const blocks = alerts.map((a, idx) => {
+  await ctx.reply(`📋 Tus alertas (${alerts.length})`)
+
+  for (const [idx, a] of alerts.entries()) {
     const wave = `${fmtRangeNumber(a.waveMin)}-${fmtRangeNumber(a.waveMax)}`
     const energy = formatCompactRange(a.energyMin, a.energyMax, 4000)
     const period = formatCompactRange(a.periodMin, a.periodMax, 16)
     const wind = a.windLabels?.join(', ') ?? 'ANY'
     const tide = `${tideTag(a.tidePreference)} (${a.tidePortName ?? 'Bermeo'})`
 
-    return [
+    const block = [
       `#${idx + 1} · ${a.name}`,
       `ID: ${a.id}`,
       `Spot: ${a.spot}`,
@@ -591,9 +615,11 @@ bot.command('listalerts', async (ctx) => {
       `Viento: ${wind}`,
       `Marea: ${tide}`,
     ].join('\n')
-  })
 
-  await ctx.reply(`📋 Tus alertas\n\n${blocks.join('\n\n────────\n\n')}`)
+    await ctx.reply(block, {
+      reply_markup: alertActionsKeyboard(a.id),
+    })
+  }
 })
 
 bot.command('deletealert', async (ctx) => {

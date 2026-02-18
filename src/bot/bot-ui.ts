@@ -90,3 +90,7 @@ export function confirmKeyboard(): InlineKeyboard {
     .text('✅ Guardar alerta', 'confirm:SAVE')
     .text('❌ Cancelar', 'confirm:CANCEL')
 }
+
+export function alertActionsKeyboard(alertId: string): InlineKeyboard {
+  return new InlineKeyboard().text('🗑️ Borrar', `delalert:${alertId}`)
+}
