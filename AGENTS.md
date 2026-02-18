@@ -92,6 +92,7 @@ data/
 | `TELEGRAM_BOT_TOKEN`   | Sí        | Token del bot de Telegram                  |
 | `BACKEND_API_URL`      | No        | URL del backend (default: waves-db-backend en Vercel) |
 | `MIN_CONSECUTIVE_HOURS`| No        | Horas consecutivas mínimas para alerta (default: 2)   |
+| `DEV_CHAT_ID`          | No        | Chat ID del desarrollador para comandos de diagnóstico y notificaciones de error |
 
 ## Notas de producto vigentes
 - Scheduler: cada hora al minuto `:10` (Europe/Madrid).
@@ -100,3 +101,10 @@ data/
 - Limpiar mensajes intermedios del wizard de creación de alerta.
 - Spot por defecto: `sopelana`.
 - `MIN_CONSECUTIVE_HOURS` configurable por env (default: 2).
+
+## Comandos dev (ocultos, requieren DEV_CHAT_ID)
+- `/status` — uptime, alertas totales, spots activos, entradas en dedupe map, último check.
+- `/checklog` — últimas 10 entradas del check-runner log.
+- `/runnow` — forzar ejecución inmediata del check-runner.
+- `/alerts_all` — listar todas las alertas de todos los usuarios (vista admin).
+- Notificación automática al DEV_CHAT_ID cuando hay errores en `bot.catch` o en check runs.
