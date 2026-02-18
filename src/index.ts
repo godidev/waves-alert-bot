@@ -588,6 +588,7 @@ if (DEV_CHAT_ID) {
   void bot.api
     .setMyCommands(
       [
+        ...BOT_COMMANDS,
         { command: 'status', description: 'Estado del bot' },
         { command: 'checklog', description: 'Últimos check runs' },
         { command: 'runnow', description: 'Forzar check run' },
