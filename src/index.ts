@@ -100,6 +100,7 @@ async function runChecks(): Promise<void> {
     matched: stats.matched,
     notified: stats.notified,
     errors: stats.errors,
+    passAll: stats.passAll,
     spots: stats.spots,
     durationMs: Date.now() - start,
     discardReasons: stats.discardReasons,
@@ -463,9 +464,9 @@ bot.command('status', async (ctx) => {
     return
   }
 
-  // Aggregate discard reasons and matched hours across entire log (48h)
+  // Aggregate discard reasons and pass-all hours across entire log (48h)
   const agg = { wave: 0, period: 0, energy: 0, wind: 0, tide: 0, light: 0 }
-  let totalMatched = 0
+  let totalPassAll = 0
   for (const entry of log) {
     const dr = entry.discardReasons
     agg.wave += dr.wave
@@ -474,7 +475,7 @@ bot.command('status', async (ctx) => {
     agg.wind += dr.wind
     agg.tide += dr.tide
     agg.light += dr.light
-    totalMatched += entry.matched
+    totalPassAll += entry.passAll
   }
 
   const lastLines = [
@@ -489,7 +490,7 @@ bot.command('status', async (ctx) => {
     `  - energía: ${agg.energy}h ❌`,
     `  - marea: ${agg.tide}h ❌`,
     `  - luz: ${agg.light}h ❌`,
-    `Horas que cumplen todo: ${totalMatched}h ✅`,
+    `Horas que cumplen todo: ${totalPassAll}h ✅`,
   ]
 
   await ctx.reply([...header, ...lastLines].join('\n'))

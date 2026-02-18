@@ -12,6 +12,7 @@ export interface CheckLogEntry {
   matched: number
   notified: number
   errors: number
+  passAll: number
   spots: string[]
   durationMs: number
   discardReasons: DiscardReasons
@@ -43,6 +44,7 @@ export function readLog(): CheckLogEntry[] {
     return parsed.map((e: Record<string, unknown>) => ({
       ...(e as unknown as CheckLogEntry),
       errors: (e.errors as number) ?? 0,
+      passAll: (e.passAll as number) ?? 0,
       discardReasons: (e.discardReasons as DiscardReasons) ?? DEFAULT_DISCARD,
     }))
   } catch {

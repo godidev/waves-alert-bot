@@ -206,6 +206,7 @@ export interface CheckRunStats {
   matched: number
   notified: number
   errors: number
+  passAll: number
   spots: string[]
   discardReasons: DiscardReasons
 }
@@ -219,6 +220,7 @@ export async function runChecksWithDeps(
     matched: 0,
     notified: 0,
     errors: 0,
+    passAll: 0,
     spots: [...new Set(deps.alerts.map((a) => a.spot))],
     discardReasons: {
       wave: 0,
@@ -250,11 +252,15 @@ export async function runChecksWithDeps(
         const detail = matchDetail(alert, f)
         if (detail.pass) {
           matchesFound.push(f)
-        } else {
-          if (!detail.wave) stats.discardReasons.wave++
-          if (!detail.period) stats.discardReasons.period++
-          if (!detail.energy) stats.discardReasons.energy++
-          if (!detail.wind) stats.discardReasons.wind++
+          stats.passAll++
+        } else if (!detail.wave) {
+          stats.discardReasons.wave++
+        } else if (!detail.period) {
+          stats.discardReasons.period++
+        } else if (!detail.energy) {
+          stats.discardReasons.energy++
+        } else if (!detail.wind) {
+          stats.discardReasons.wind++
         }
       }
       if (!matchesFound.length) continue
