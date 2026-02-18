@@ -8,7 +8,7 @@ import {
   touchAlertNotified,
 } from './infra/storage.js'
 import { runChecksWithDeps, type AlertWindow } from './core/check-runner.js'
-import { appendCheckLog } from './infra/check-logger.js'
+import { appendCheckLog, readLog } from './infra/check-logger.js'
 import { startHourlySchedulerAtMinute } from './core/scheduler.js'
 import { buildCleanupDeleteList } from './bot/flow-cleanup.js'
 import {
@@ -46,9 +46,17 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL =
   process.env.BACKEND_API_URL ?? 'https://waves-db-backend.vercel.app'
 const MIN_CONSECUTIVE_HOURS = Number(process.env.MIN_CONSECUTIVE_HOURS ?? 2)
+const DEV_CHAT_ID = process.env.DEV_CHAT_ID
+  ? Number(process.env.DEV_CHAT_ID)
+  : undefined
 
 const drafts = new Map<number, DraftAlert>()
 const lastSentWindows = new Map<string, AlertWindow>()
+const startedAt = Date.now()
+
+function isDevChat(chatId: number): boolean {
+  return DEV_CHAT_ID !== undefined && chatId === DEV_CHAT_ID
+}
 
 if (!BOT_TOKEN) throw new Error('Missing TELEGRAM_BOT_TOKEN')
 
