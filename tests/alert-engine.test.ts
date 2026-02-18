@@ -151,8 +151,8 @@ test('buildAlertMessage() usa nuevo formato de fecha/rango/empieza y mareas cerc
     msg,
     /<pre>[\s\S]*Hora\s+\|\s+m\s+\|\s+E\s+\|\s+V\(km\/h\)\s+\|\s+T\(s\)[\s\S]*<\/pre>/,
   )
-  assert.match(msg, /12:30\s+\|\s+⬆️ Marea alta \(3.20m\)/)
-  assert.match(msg, /07:00\s+\|\s+⬇️ Marea baja \(0.80m\)/)
+  assert.match(msg, /13:30\s+\|\s+⬆️ Marea alta \(3.20m\)/)
+  assert.match(msg, /08:00\s+\|\s+⬇️ Marea baja \(0.80m\)/)
   assert.match(msg, /\. \./)
   assert.match(msg, /11:00\s+\|\s+1\.5\s+\|\s+1200\s+\|\s+10↙\s+\|\s+11/)
 })

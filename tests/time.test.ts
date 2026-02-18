@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseMadridLocalDateTime } from '../src/core/time.js'
+import { parseMadridLocalDateTime, parseUtcDateTime } from '../src/core/time.js'
 
 test('parseMadridLocalDateTime convierte hora local de invierno a UTC', () => {
   const parsed = parseMadridLocalDateTime('2026-01-15', '12:00')
@@ -17,4 +17,10 @@ test('parseMadridLocalDateTime convierte hora local de verano a UTC', () => {
 test('parseMadridLocalDateTime devuelve null para hora inexistente en salto DST', () => {
   const parsed = parseMadridLocalDateTime('2026-03-29', '02:30')
   assert.equal(parsed, null)
+})
+
+test('parseUtcDateTime interpreta hora como UTC exacta', () => {
+  const parsed = parseUtcDateTime('2026-02-19', '04:34')
+  assert.ok(parsed)
+  assert.equal(parsed?.toISOString(), '2026-02-19T04:34:00.000Z')
 })

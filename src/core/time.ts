@@ -142,3 +142,21 @@ export function parseMadridLocalDateTime(
   cacheParseResult(cacheKey, parsed)
   return new Date(parsed.getTime())
 }
+
+export function parseUtcDateTime(dateYmd: string, timeHm: string): Date | null {
+  const datePart = parseDateYmd(dateYmd)
+  const timePart = parseTimeHm(timeHm)
+  if (!datePart || !timePart) return null
+
+  return new Date(
+    Date.UTC(
+      datePart.year,
+      datePart.month - 1,
+      datePart.day,
+      timePart.hour,
+      timePart.minute,
+      0,
+      0,
+    ),
+  )
+}

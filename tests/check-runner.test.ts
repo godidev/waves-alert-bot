@@ -160,13 +160,13 @@ test('runChecksWithDeps marea alta: filtra fuera de ventana ±3h de pleamar', as
   assert.equal(sent, 0)
 })
 
-test('runChecksWithDeps marea alta interpreta horas de marea en Europe/Madrid', async () => {
+test('runChecksWithDeps marea alta interpreta horas de marea en UTC', async () => {
   let sent = 0
 
   await runChecksWithDeps({
     alerts: [mkAlert({ tidePreference: 'high' })],
     minConsecutiveHours: 1,
-    fetchForecasts: async () => [mkForecast('2026-01-15T15:00:00.000Z')],
+    fetchForecasts: async () => [mkForecast('2026-01-15T16:00:00.000Z')],
     isWithinAlertWindow: async () => true,
     getTideEventsForDate: async () => [
       { date: '2026-01-15', hora: '06:00', altura: 0.8, tipo: 'bajamar' },
@@ -179,7 +179,7 @@ test('runChecksWithDeps marea alta interpreta horas de marea en Europe/Madrid', 
     touchAlertNotified: () => undefined,
   })
 
-  // 12:00 Europe/Madrid en enero = 11:00Z -> ventana 08:00..14:00Z.
-  // El forecast 15:00Z queda fuera.
+  // 12:00 (API UTC) -> ventana 09:00..15:00Z.
+  // El forecast 16:00Z queda fuera.
   assert.equal(sent, 0)
 })

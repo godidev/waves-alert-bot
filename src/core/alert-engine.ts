@@ -6,7 +6,7 @@ import {
   totalWaveHeight,
   windArrowFromDegrees,
 } from './utils.js'
-import { MADRID_TIME_ZONE, parseMadridLocalDateTime } from './time.js'
+import { MADRID_TIME_ZONE, parseUtcDateTime } from './time.js'
 
 export type TideEvent = {
   date: string
@@ -137,7 +137,7 @@ export function firstConsecutiveWindow(
 }
 
 function parseTideDate(e: TideEvent): Date | null {
-  return parseMadridLocalDateTime(e.date, e.hora)
+  return parseUtcDateTime(e.date, e.hora)
 }
 
 export function findNearestTides(
@@ -202,7 +202,9 @@ function tideBandLine(
   rightWidth: number,
 ): string {
   const icon = label === 'Marea alta' ? '⬆️' : '⬇️'
-  const hour = padEndDisplay(event.hora, hourWidth)
+  const tideAt = parseTideDate(event)
+  const hourText = tideAt ? formatHour(tideAt) : event.hora
+  const hour = padEndDisplay(hourText, hourWidth)
   const rightText = `${icon} ${label} (${event.altura.toFixed(2)}m)`
   const right = padCenterDisplay(rightText, rightWidth)
   return `${hour} | ${right}`
@@ -353,7 +355,7 @@ function formatHourlyTable(
   const tideMarkers = [
     nearestTides.high
       ? {
-          at: parseMadridLocalDateTime(
+          at: parseUtcDateTime(
             nearestTides.high.date,
             nearestTides.high.hora,
           )?.getTime(),
@@ -363,7 +365,7 @@ function formatHourlyTable(
       : null,
     nearestTides.low
       ? {
-          at: parseMadridLocalDateTime(
+          at: parseUtcDateTime(
             nearestTides.low.date,
             nearestTides.low.hora,
           )?.getTime(),
