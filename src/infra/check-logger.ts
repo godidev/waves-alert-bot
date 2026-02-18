@@ -4,7 +4,7 @@ import { dirname } from 'node:path'
 const LOG_PATH = process.env.CHECK_LOG_PATH ?? './data/check-log.json'
 const MAX_ENTRIES = 48
 
-interface CheckLogEntry {
+export interface CheckLogEntry {
   timestamp: string
   totalAlerts: number
   matched: number
@@ -21,7 +21,7 @@ function ensureLogFile(): void {
   }
 }
 
-function readLog(): CheckLogEntry[] {
+export function readLog(): CheckLogEntry[] {
   ensureLogFile()
   try {
     const raw = readFileSync(LOG_PATH, 'utf-8')
