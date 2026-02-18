@@ -103,6 +103,12 @@ pm2 startup
 
 # rotación de logs (opcional recomendado)
 pm2 install pm2-logrotate
+
+# deploy/restart en un solo comando (desde la raíz del repo)
+./scripts/deploy-pm2.sh
+
+# versión estricta con lint+format+tests+build
+RUN_CHECKS=1 ./scripts/deploy-pm2.sh
 ```
 
 `ecosystem.config.cjs` usa `cwd` dinámico para ser portable entre máquinas/rutas.
