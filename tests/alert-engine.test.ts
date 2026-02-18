@@ -4,6 +4,7 @@ import {
   buildAlertMessage,
   findNearestTides,
   firstConsecutiveWindow,
+  matchDetail,
   matches,
 } from '../src/core/alert-engine.js'
 import type { AlertRule, SurfForecast } from '../src/core/types.js'
@@ -57,6 +58,36 @@ test('matches() valida rangos de ola/periodo/energía/viento', () => {
     matches(alert, mkForecast('2026-02-16T10:00:00.000Z', 1200, 180)),
     false,
   )
+})
+
+test('matchDetail() returns per-filter pass/fail booleans', () => {
+  const alert = mkAlert()
+
+  // All pass
+  const allPass = matchDetail(alert, mkForecast('2026-02-16T10:00:00.000Z'))
+  assert.equal(allPass.pass, true)
+  assert.equal(allPass.wave, true)
+  assert.equal(allPass.period, true)
+  assert.equal(allPass.energy, true)
+  assert.equal(allPass.wind, true)
+
+  // Energy fail (500 < energyMin 800)
+  const energyFail = matchDetail(
+    alert,
+    mkForecast('2026-02-16T10:00:00.000Z', 500),
+  )
+  assert.equal(energyFail.pass, false)
+  assert.equal(energyFail.energy, false)
+  assert.equal(energyFail.wave, true)
+
+  // Wind fail (180° outside 22.5-67.5 range)
+  const windFail = matchDetail(
+    alert,
+    mkForecast('2026-02-16T10:00:00.000Z', 1200, 180),
+  )
+  assert.equal(windFail.pass, false)
+  assert.equal(windFail.wind, false)
+  assert.equal(windFail.wave, true)
 })
 
 test('firstConsecutiveWindow() encuentra la primera ventana consecutiva', () => {
