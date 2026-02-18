@@ -439,21 +439,45 @@ bot.command('status', async (ctx) => {
       minute: '2-digit',
     })
 
-  const lastCheckLine = last
-    ? `${fmtDate(last.timestamp)} (${last.durationMs}ms) — matched: ${last.matched}, enviadas: ${last.notified}`
-    : 'sin datos'
+  // Latency percentiles from historical log
+  const durations = log.map((e) => e.durationMs).sort((a, b) => a - b)
+  const percentile = (arr: number[], p: number) =>
+    arr.length ? arr[Math.min(Math.floor(arr.length * p), arr.length - 1)] : 0
+  const p50 = percentile(durations, 0.5)
+  const p95 = percentile(durations, 0.95)
 
-  const lines = [
+  // Error stats from log
+  const okChecks = log.filter((e) => e.errors === 0).length
+  const errChecks = log.filter((e) => e.errors > 0).length
+
+  const spotsLine = spots.length ? spots.join(', ') : 'ninguno'
+
+  const header = [
     '--- Bot Status ---',
-    `Uptime: ${uptimeH}h ${uptimeM}m`,
-    `Alertas totales: ${allAlerts.length}`,
-    `Spots activos: ${spots.length ? spots.join(', ') : 'ninguno'}`,
-    `Alertas con envío reciente: ${lastSentWindows.size}`,
-    `Último check: ${lastCheckLine}`,
-    `Historial checks: ${log.length}/48`,
+    `Uptime: ${uptimeH}h ${uptimeM}m | Checks: ${log.length} (ok:${okChecks} err:${errChecks}) | Lat p50: ${p50}ms p95: ${p95}ms`,
+    `Alertas activas: ${allAlerts.length} (${spotsLine}) | Cooldowns activos: ${lastSentWindows.size}`,
   ]
 
-  await ctx.reply(lines.join('\n'))
+  if (!last) {
+    await ctx.reply([...header, '', 'Sin datos de checks.'].join('\n'))
+    return
+  }
+
+  const d = last.discardReasons
+  const lastLines = [
+    '',
+    `Último check: ${fmtDate(last.timestamp)} — ${last.durationMs}ms`,
+    `Matched: ${last.matched} | Enviadas: ${last.notified}`,
+    'Motivos de descarte (último check):',
+    `  - viento: ${d.wind}`,
+    `  - marea: ${d.tide}`,
+    `  - ola: ${d.wave}`,
+    `  - periodo: ${d.period}`,
+    `  - energía: ${d.energy}`,
+    `  - luz (fuera de horario): ${d.light}`,
+  ]
+
+  await ctx.reply([...header, ...lastLines].join('\n'))
 })
 
 bot.command('checklog', async (ctx) => {
