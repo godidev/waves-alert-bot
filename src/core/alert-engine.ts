@@ -50,6 +50,40 @@ export function matches(alert: AlertRule, f: SurfForecast): boolean {
   return inWave && inPeriod && inEnergy && inWind
 }
 
+export interface MatchDetail {
+  pass: boolean
+  wave: boolean
+  period: boolean
+  energy: boolean
+  wind: boolean
+}
+
+export function matchDetail(alert: AlertRule, f: SurfForecast): MatchDetail {
+  const wave = totalWaveHeight(f)
+  const period = primaryPeriod(f)
+  const energy = f.energy
+  const windAngle = normalizeAngle(f.wind.angle)
+
+  const inWave = alert.waveRanges?.length
+    ? alert.waveRanges.some((r) => isInRange(wave, r.min, r.max))
+    : isInRange(wave, alert.waveMin, alert.waveMax)
+  const inPeriod = alert.periodRanges?.length
+    ? alert.periodRanges.some((r) => isInRange(period, r.min, r.max))
+    : isInRange(period, alert.periodMin, alert.periodMax)
+  const inEnergy = energy >= alert.energyMin && energy <= alert.energyMax
+  const inWind =
+    !alert.windRanges?.length ||
+    alert.windRanges.some((r) => isWindInRange(windAngle, r.min, r.max))
+
+  return {
+    pass: inWave && inPeriod && inEnergy && inWind,
+    wave: inWave,
+    period: inPeriod,
+    energy: inEnergy,
+    wind: inWind,
+  }
+}
+
 export function firstConsecutiveWindow(
   items: CandidateMatch[],
   minHours: number,
