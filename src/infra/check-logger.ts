@@ -4,13 +4,17 @@ import { dirname } from 'node:path'
 const LOG_PATH = process.env.CHECK_LOG_PATH ?? './data/check-log.json'
 const MAX_ENTRIES = 48
 
+import type { DiscardReasons } from '../core/check-runner.js'
+
 export interface CheckLogEntry {
   timestamp: string
   totalAlerts: number
   matched: number
   notified: number
+  errors: number
   spots: string[]
   durationMs: number
+  discardReasons: DiscardReasons
 }
 
 function ensureLogFile(): void {
@@ -21,12 +25,26 @@ function ensureLogFile(): void {
   }
 }
 
+const DEFAULT_DISCARD: DiscardReasons = {
+  wave: 0,
+  period: 0,
+  energy: 0,
+  wind: 0,
+  tide: 0,
+  light: 0,
+}
+
 export function readLog(): CheckLogEntry[] {
   ensureLogFile()
   try {
     const raw = readFileSync(LOG_PATH, 'utf-8')
     const parsed: unknown = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as CheckLogEntry[]) : []
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((e: Record<string, unknown>) => ({
+      ...(e as unknown as CheckLogEntry),
+      errors: (e.errors as number) ?? 0,
+      discardReasons: (e.discardReasons as DiscardReasons) ?? DEFAULT_DISCARD,
+    }))
   } catch {
     return []
   }

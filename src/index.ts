@@ -99,8 +99,10 @@ async function runChecks(): Promise<void> {
     totalAlerts: stats.totalAlerts,
     matched: stats.matched,
     notified: stats.notified,
+    errors: stats.errors,
     spots: stats.spots,
     durationMs: Date.now() - start,
+    discardReasons: stats.discardReasons,
   })
 }
 
