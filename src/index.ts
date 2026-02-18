@@ -62,8 +62,16 @@ if (!BOT_TOKEN) throw new Error('Missing TELEGRAM_BOT_TOKEN')
 
 const bot = new Bot(BOT_TOKEN)
 
+function notifyDev(message: string): void {
+  if (!DEV_CHAT_ID) return
+  bot.api.sendMessage(DEV_CHAT_ID, message).catch(() => {
+    // noop – avoid infinite error loops
+  })
+}
+
 bot.catch((err) => {
   console.error('bot_error', err.error)
+  notifyDev(`[bot.catch] ${String(err.error)}`)
 })
 
 async function runChecks(): Promise<void> {
@@ -557,7 +565,17 @@ void bot.api.setMyCommands(BOT_COMMANDS).catch(() => {
 })
 
 bot.start()
-startHourlySchedulerAtMinute(() => runChecks(), 10)
-void runChecks()
+startHourlySchedulerAtMinute(
+  () =>
+    runChecks().catch((err) => {
+      console.error('scheduler_check_error', err)
+      notifyDev(`[scheduler] Check run error: ${String(err)}`)
+    }),
+  10,
+)
+void runChecks().catch((err) => {
+  console.error('initial_check_error', err)
+  notifyDev(`[startup] Check run error: ${String(err)}`)
+})
 
 console.log('waves-alerts-bot running. scheduler=:10 Europe/Madrid')
