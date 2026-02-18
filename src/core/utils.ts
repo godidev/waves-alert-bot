@@ -3,14 +3,14 @@ import type { SurfForecast } from './types.js'
 type Cardinal = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW'
 
 const WIND_ARROWS: Record<Cardinal, string> = {
-  N: '↓',
-  NE: '↙',
-  E: '←',
-  SE: '↖',
-  S: '↑',
-  SW: '↗',
-  W: '→',
-  NW: '↘',
+  N: '\u2193',
+  NE: '\u2199',
+  E: '\u2190',
+  SE: '\u2196',
+  S: '\u2191',
+  SW: '\u2197',
+  W: '\u2192',
+  NW: '\u2198',
 }
 
 export function totalWaveHeight(f: SurfForecast): number {

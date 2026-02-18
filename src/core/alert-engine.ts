@@ -275,6 +275,13 @@ function padCenterDisplay(value: string, width: number): string {
   return `${' '.repeat(left)}${value}${' '.repeat(right)}`
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+}
+
 function formatHourlyTable(
   forecasts: SurfForecast[],
   nearestTides: { low: TideEvent | null; high: TideEvent | null },
@@ -312,7 +319,7 @@ function formatHourlyTable(
     },
   ]
 
-  const numericColumns = new Set([1, 2, 4])
+  const numericColumns = new Set([1, 2, 3, 4])
 
   const widths = columns.map((col) =>
     Math.max(
@@ -434,11 +441,8 @@ function formatHourlyTable(
     lines.push(tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth))
   }
 
-  return [
-    `<code>${header}</code>`,
-    `<code>${separator}</code>`,
-    ...lines.map((line) => `<code>${line}</code>`),
-  ].join('\n')
+  const table = [header, separator, ...lines].join('\n')
+  return `<pre>${escapeHtml(table)}</pre>`
 }
 
 export function buildAlertMessage(params: {
