@@ -258,22 +258,22 @@ function formatHourlyTable(
       values: slice.map((f) => formatHour(new Date(f.date))),
     },
     {
-      header: '🌊',
+      header: 'm',
       values: slice.map((f) => totalWaveHeight(f).toFixed(1)),
     },
     {
-      header: '⚡',
+      header: 'E',
       values: slice.map((f) => `${Math.round(f.energy)}`),
     },
     {
-      header: '💨',
+      header: 'V(km/h)',
       values: slice.map(
         (f) =>
           `${Math.round(f.wind.speed)}${windArrowFromDegrees(f.wind.angle)}`,
       ),
     },
     {
-      header: '⏱',
+      header: 'T(s)',
       values: slice.map((f) => `${Math.round(primaryPeriod(f))}`),
     },
   ]
@@ -437,8 +437,6 @@ export function buildAlertMessage(params: {
     `🏄 ${totalWaveHeight(first).toFixed(2)}m @${primaryPeriod(first).toFixed(1)}s`,
     `⚡  ${first.energy.toFixed(0)}`,
     `💨 ${Math.round(first.wind.speed)} km/h ${degreesToCardinal(first.wind.angle)} ${windArrowFromDegrees(first.wind.angle)} (${first.wind.angle.toFixed(0)}°)`,
-    ...(hourlyTable
-      ? [hourlyTable]
-      : []),
+    ...(hourlyTable ? [hourlyTable] : []),
   ].join('\n')
 }
