@@ -234,3 +234,43 @@ test('runChecksWithDeps ignora alertas pausadas', async () => {
   assert.equal(fetchCalls, 0)
   assert.equal(sent, 0)
 })
+
+test('runChecksWithDeps registra match en cada rerun aunque dedupe evite envío', async () => {
+  const sentWindows = new Map<string, { startMs: number; endMs: number }>()
+  let sent = 0
+  let matchRecords = 0
+  let sentRecords = 0
+
+  const deps = {
+    alerts: [mkAlert({ id: 'alert-rerun', chatId: 123 })],
+    minConsecutiveHours: 1,
+    fetchForecasts: async () => [mkForecast('2026-02-16T09:00:00.000Z')],
+    isWithinAlertWindow: async () => true,
+    getTideEventsForDate: async () => mkTides(),
+    apiDateFromForecastDate: () => '20260216',
+    sendMessage: async () => {
+      sent++
+    },
+    touchAlertNotified: () => undefined,
+    getLastWindow: (key: string) => sentWindows.get(key),
+    setLastWindow: (
+      key: string,
+      window: { startMs: number; endMs: number },
+    ) => {
+      sentWindows.set(key, window)
+    },
+    recordNotificationMatch: () => {
+      matchRecords++
+    },
+    recordNotificationSent: () => {
+      sentRecords++
+    },
+  }
+
+  await runChecksWithDeps(deps)
+  await runChecksWithDeps(deps)
+
+  assert.equal(matchRecords, 2)
+  assert.equal(sentRecords, 1)
+  assert.equal(sent, 1)
+})

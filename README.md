@@ -115,4 +115,5 @@ RUN_CHECKS=1 ./scripts/deploy-pm2.sh
 
 ## Almacenamiento
 - Alertas en `data/alerts.json`.
+- Notificaciones detectadas/enviadas en `data/notifications-log.json` (se purgan cuando su ventana ya terminó).
 - El bot convierte selecciones múltiples en rangos internos para evaluar alertas.

@@ -26,6 +26,24 @@ interface CheckRunnerDeps {
   apiDateFromForecastDate: (dateRaw: string) => string
   sendMessage: (chatId: number, message: string) => Promise<void>
   touchAlertNotified: (id: string, at: string) => void
+  recordNotificationMatch?: (event: {
+    chatId: number
+    alertId: string
+    alertName: string
+    spot: string
+    windowStartIso: string
+    windowEndIso: string
+    atIso: string
+  }) => void
+  recordNotificationSent?: (event: {
+    chatId: number
+    alertId: string
+    alertName: string
+    spot: string
+    windowStartIso: string
+    windowEndIso: string
+    atIso: string
+  }) => void
   getLastWindow?: (key: string) => AlertWindow | undefined
   setLastWindow?: (key: string, window: AlertWindow) => void
   nowMs?: () => number
@@ -291,6 +309,19 @@ export async function runChecksWithDeps(
         startMs: startDate.getTime(),
         endMs: endDate.getTime() + 60 * 60 * 1000,
       }
+      const windowStartIso = new Date(newWindow.startMs).toISOString()
+      const windowEndIso = new Date(newWindow.endMs).toISOString()
+      const matchedAtIso = new Date(now()).toISOString()
+
+      deps.recordNotificationMatch?.({
+        chatId: alert.chatId,
+        alertId: alert.id,
+        alertName: alert.name,
+        spot: alert.spot,
+        windowStartIso,
+        windowEndIso,
+        atIso: matchedAtIso,
+      })
 
       const dedupeKey = `${alert.chatId}:${alert.spot}:${buildAlertProfileKey(alert)}`
       const prevWindow = deps.getLastWindow?.(dedupeKey)
@@ -313,7 +344,17 @@ export async function runChecksWithDeps(
 
       await deps.sendMessage(alert.chatId, message)
       deps.setLastWindow?.(dedupeKey, newWindow)
-      deps.touchAlertNotified(alert.id, new Date(now()).toISOString())
+      const sentAtIso = new Date(now()).toISOString()
+      deps.touchAlertNotified(alert.id, sentAtIso)
+      deps.recordNotificationSent?.({
+        chatId: alert.chatId,
+        alertId: alert.id,
+        alertName: alert.name,
+        spot: alert.spot,
+        windowStartIso,
+        windowEndIso,
+        atIso: sentAtIso,
+      })
       stats.notified++
     } catch (err) {
       console.error(`check_alert_error alert=${alert.id}`, err)

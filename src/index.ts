@@ -10,6 +10,10 @@ import {
 } from './infra/storage.js'
 import { runChecksWithDeps, type AlertWindow } from './core/check-runner.js'
 import { appendCheckLog, readLog } from './infra/check-logger.js'
+import {
+  recordNotificationMatch,
+  recordNotificationSent,
+} from './infra/notification-log.js'
 import { startHourlySchedulerAtMinute } from './core/scheduler.js'
 import { buildCleanupDeleteList } from './bot/flow-cleanup.js'
 import {
@@ -91,6 +95,8 @@ async function runChecks(): Promise<void> {
         .sendMessage(chatId, message, { parse_mode: 'HTML' })
         .then(() => undefined),
     touchAlertNotified,
+    recordNotificationMatch,
+    recordNotificationSent,
     getLastWindow: (key) => lastSentWindows.get(key),
     setLastWindow: (key, window) => {
       lastSentWindows.set(key, window)
