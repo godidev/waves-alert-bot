@@ -230,7 +230,7 @@ bot.on('message:text', async (ctx, next) => {
 
   await flowReply(ctx, d, `Spot fijo: ${DEFAULT_SPOT}`)
   await flowReply(ctx, d, 'Elige una o varias alturas:', {
-    reply_markup: keyboardFromOptions('wave', WAVE_OPTIONS, []),
+    reply_markup: keyboardFromOptions('wave', WAVE_OPTIONS, [], true, true),
   })
 })
 
@@ -314,6 +314,13 @@ bot.on('callback_query:data', async (ctx) => {
   }
 
   if (prefix === 'wave') {
+    if (value === 'BACK') {
+      d.step = 'name'
+      await ctx.answerCallbackQuery({ text: 'Paso anterior' })
+      await flowReply(ctx, d, 'Pon un nombre para la alerta:')
+      return
+    }
+
     if (value === 'DONE') {
       if (!d.waveSelected.length) {
         await ctx.answerCallbackQuery({
@@ -328,6 +335,8 @@ bot.on('callback_query:data', async (ctx) => {
           'energy',
           ENERGY_OPTIONS,
           d.energySelected,
+          true,
+          true,
         ),
       })
       return
@@ -339,12 +348,27 @@ bot.on('callback_query:data', async (ctx) => {
     })
     await safeEditReplyMarkup(
       ctx,
-      keyboardFromOptions('wave', WAVE_OPTIONS, d.waveSelected),
+      keyboardFromOptions('wave', WAVE_OPTIONS, d.waveSelected, true, true),
     )
     return
   }
 
   if (prefix === 'energy') {
+    if (value === 'BACK') {
+      d.step = 'wave'
+      await ctx.answerCallbackQuery({ text: 'Paso anterior' })
+      await flowReply(ctx, d, 'Elige una o varias alturas:', {
+        reply_markup: keyboardFromOptions(
+          'wave',
+          WAVE_OPTIONS,
+          d.waveSelected,
+          true,
+          true,
+        ),
+      })
+      return
+    }
+
     if (value === 'DONE') {
       if (!d.energySelected.length) {
         await ctx.answerCallbackQuery({
@@ -359,6 +383,8 @@ bot.on('callback_query:data', async (ctx) => {
           'period',
           PERIOD_OPTIONS,
           d.periodSelected,
+          true,
+          true,
         ),
       })
       return
@@ -370,12 +396,33 @@ bot.on('callback_query:data', async (ctx) => {
     })
     await safeEditReplyMarkup(
       ctx,
-      keyboardFromOptions('energy', ENERGY_OPTIONS, d.energySelected),
+      keyboardFromOptions(
+        'energy',
+        ENERGY_OPTIONS,
+        d.energySelected,
+        true,
+        true,
+      ),
     )
     return
   }
 
   if (prefix === 'period') {
+    if (value === 'BACK') {
+      d.step = 'energy'
+      await ctx.answerCallbackQuery({ text: 'Paso anterior' })
+      await flowReply(ctx, d, 'Elige uno o varios rangos de energía:', {
+        reply_markup: keyboardFromOptions(
+          'energy',
+          ENERGY_OPTIONS,
+          d.energySelected,
+          true,
+          true,
+        ),
+      })
+      return
+    }
+
     if (value === 'DONE') {
       if (!d.periodSelected.length) {
         await ctx.answerCallbackQuery({
@@ -386,7 +433,7 @@ bot.on('callback_query:data', async (ctx) => {
       d.step = 'wind'
       await ctx.answerCallbackQuery({ text: 'OK' })
       await flowReply(ctx, d, 'Elige una o varias direcciones de viento:', {
-        reply_markup: windKeyboard(d.windSelected),
+        reply_markup: windKeyboard(d.windSelected, true),
       })
       return
     }
@@ -397,18 +444,39 @@ bot.on('callback_query:data', async (ctx) => {
     })
     await safeEditReplyMarkup(
       ctx,
-      keyboardFromOptions('period', PERIOD_OPTIONS, d.periodSelected),
+      keyboardFromOptions(
+        'period',
+        PERIOD_OPTIONS,
+        d.periodSelected,
+        true,
+        true,
+      ),
     )
     return
   }
 
   if (prefix === 'wind') {
+    if (value === 'BACK') {
+      d.step = 'period'
+      await ctx.answerCallbackQuery({ text: 'Paso anterior' })
+      await flowReply(ctx, d, 'Elige uno o varios rangos de periodo:', {
+        reply_markup: keyboardFromOptions(
+          'period',
+          PERIOD_OPTIONS,
+          d.periodSelected,
+          true,
+          true,
+        ),
+      })
+      return
+    }
+
     if (value === 'ANY') {
       d.windSelected = []
       d.step = 'tidePort'
       await ctx.answerCallbackQuery({ text: 'OK' })
       await flowReply(ctx, d, 'Elige puerto de marea de referencia:', {
-        reply_markup: tidePortKeyboard(d.tidePortId),
+        reply_markup: tidePortKeyboard(d.tidePortId, true),
       })
       return
     }
@@ -417,7 +485,7 @@ bot.on('callback_query:data', async (ctx) => {
       d.step = 'tidePort'
       await ctx.answerCallbackQuery({ text: 'OK' })
       await flowReply(ctx, d, 'Elige puerto de marea de referencia:', {
-        reply_markup: tidePortKeyboard(d.tidePortId),
+        reply_markup: tidePortKeyboard(d.tidePortId, true),
       })
       return
     }
@@ -431,11 +499,20 @@ bot.on('callback_query:data', async (ctx) => {
     await ctx.answerCallbackQuery({
       text: `Viento: ${d.windSelected.join(', ') || 'ANY'}`,
     })
-    await safeEditReplyMarkup(ctx, windKeyboard(d.windSelected))
+    await safeEditReplyMarkup(ctx, windKeyboard(d.windSelected, true))
     return
   }
 
   if (prefix === 'tideport') {
+    if (value === 'BACK') {
+      d.step = 'wind'
+      await ctx.answerCallbackQuery({ text: 'Paso anterior' })
+      await flowReply(ctx, d, 'Elige una o varias direcciones de viento:', {
+        reply_markup: windKeyboard(d.windSelected, true),
+      })
+      return
+    }
+
     if (value === 'DONE') {
       if (!d.tidePortId) {
         await ctx.answerCallbackQuery({ text: 'Elige un puerto' })
@@ -444,7 +521,7 @@ bot.on('callback_query:data', async (ctx) => {
       d.step = 'tidePref'
       await ctx.answerCallbackQuery({ text: 'OK' })
       await flowReply(ctx, d, 'Elige marea ideal:', {
-        reply_markup: tidePreferenceKeyboard(d.tidePreference),
+        reply_markup: tidePreferenceKeyboard(d.tidePreference, true),
       })
       return
     }
@@ -458,11 +535,21 @@ bot.on('callback_query:data', async (ctx) => {
     await ctx.answerCallbackQuery({
       text: `Puerto: ${TIDE_PORT_OPTIONS.find((p) => p.id === value)?.label}`,
     })
-    await safeEditReplyMarkup(ctx, tidePortKeyboard(d.tidePortId))
+    await safeEditReplyMarkup(ctx, tidePortKeyboard(d.tidePortId, true))
     return
   }
 
   if (prefix === 'tidepref') {
+    if (value === 'BACK') {
+      d.step = 'tidePort'
+      d.pendingAlert = undefined
+      await ctx.answerCallbackQuery({ text: 'Paso anterior' })
+      await flowReply(ctx, d, 'Elige puerto de marea de referencia:', {
+        reply_markup: tidePortKeyboard(d.tidePortId, true),
+      })
+      return
+    }
+
     if (!TIDE_PREF_OPTIONS.find((p) => p.id === value)) {
       await ctx.answerCallbackQuery({ text: 'Opción inválida' })
       return
@@ -485,6 +572,16 @@ bot.on('callback_query:data', async (ctx) => {
   }
 
   if (prefix === 'confirm') {
+    if (value === 'BACK') {
+      d.step = 'tidePref'
+      d.pendingAlert = undefined
+      await ctx.answerCallbackQuery({ text: 'Paso anterior' })
+      await flowReply(ctx, d, 'Elige marea ideal:', {
+        reply_markup: tidePreferenceKeyboard(d.tidePreference, true),
+      })
+      return
+    }
+
     if (value === 'CANCEL') {
       await cleanupDraftMessages(chatId, d)
       drafts.delete(chatId)

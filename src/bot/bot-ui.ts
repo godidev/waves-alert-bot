@@ -34,6 +34,7 @@ export function keyboardFromOptions(
   options: RangeOption[],
   selected: string[],
   allowDone = true,
+  allowBack = false,
 ): InlineKeyboard {
   const kb = new InlineKeyboard()
   options.forEach((o, idx) => {
@@ -43,10 +44,14 @@ export function keyboardFromOptions(
   })
   kb.row()
   if (allowDone) kb.text('✅ Confirmar', `${prefix}:DONE`)
+  if (allowBack) kb.text('⬅️ Atrás', `${prefix}:BACK`)
   return kb
 }
 
-export function windKeyboard(selected: string[]): InlineKeyboard {
+export function windKeyboard(
+  selected: string[],
+  allowBack = false,
+): InlineKeyboard {
   const kb = new InlineKeyboard()
   WIND_SECTORS.forEach((s, idx) => {
     const prefix = selected.includes(s.id) ? '✅ ' : ''
@@ -57,10 +62,14 @@ export function windKeyboard(selected: string[]): InlineKeyboard {
     if (idx % 2 === 1) kb.row()
   })
   kb.text('ANY (sin filtro)', 'wind:ANY').text('✅ Confirmar', 'wind:DONE')
+  if (allowBack) kb.text('⬅️ Atrás', 'wind:BACK')
   return kb
 }
 
-export function tidePortKeyboard(selected?: string): InlineKeyboard {
+export function tidePortKeyboard(
+  selected?: string,
+  allowBack = false,
+): InlineKeyboard {
   const kb = new InlineKeyboard()
   TIDE_PORT_OPTIONS.forEach((p) => {
     kb.text(
@@ -69,11 +78,13 @@ export function tidePortKeyboard(selected?: string): InlineKeyboard {
     ).row()
   })
   kb.text('✅ Confirmar', 'tideport:DONE')
+  if (allowBack) kb.text('⬅️ Atrás', 'tideport:BACK')
   return kb
 }
 
 export function tidePreferenceKeyboard(
   selected?: TidePreferenceId,
+  allowBack = false,
 ): InlineKeyboard {
   const kb = new InlineKeyboard()
   TIDE_PREF_OPTIONS.forEach((p) => {
@@ -82,6 +93,7 @@ export function tidePreferenceKeyboard(
       `tidepref:${p.id}`,
     ).row()
   })
+  if (allowBack) kb.text('⬅️ Atrás', 'tidepref:BACK')
   return kb
 }
 
@@ -89,6 +101,8 @@ export function confirmKeyboard(): InlineKeyboard {
   return new InlineKeyboard()
     .text('✅ Guardar alerta', 'confirm:SAVE')
     .text('❌ Cancelar', 'confirm:CANCEL')
+    .row()
+    .text('⬅️ Atrás', 'confirm:BACK')
 }
 
 export function alertActionsKeyboard(
