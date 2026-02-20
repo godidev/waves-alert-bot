@@ -85,7 +85,7 @@ export interface DraftAlert {
 }
 
 export const COMMANDS_HELP =
-  'Comandos:\n/setalert - crear alerta guiada\n/listalerts - listar alertas\n/pausealert <id> - pausar alerta\n/resumealert <id> - reanudar alerta\n/deletealert <id> - borrar alerta\n/cancel - cancelar flujo actual\n/help - ver comandos'
+  'Comandos:\n/setalert - crear alerta guiada (con botón ⬅️ Atrás en cada paso)\n/listalerts - ver alertas y borrar/pausar/reanudar con botones\n/pausealert <id> - pausar alerta por ID\n/resumealert <id> - reanudar alerta por ID\n/deletealert <id> - borrar alerta por ID\n/cancel - cancelar flujo actual\n/help - ver esta ayuda\n\nMarea en alertas:\n- ANY: sin filtro de marea\n- Alta/Baja: solo horas dentro de ±3h de la marea seleccionada\n- Media: filtro por clase de marea interpolada\n\nNotas:\n- Spot por defecto: sopelana\n- Se evita spam con deduplicación de ventana (si la ventana no cambia, no reenvía)'
 
 export const BOT_COMMANDS = [
   { command: 'start', description: 'Iniciar bot y ver ayuda' },
