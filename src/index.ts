@@ -9,6 +9,7 @@ import {
   touchAlertNotified,
 } from './infra/storage.js'
 import { runChecksWithDeps, type AlertWindow } from './core/check-runner.js'
+import { buildAlertMessage } from './core/alert-engine.js'
 import { appendCheckLog, readLog } from './infra/check-logger.js'
 import {
   recordNotificationMatch,
@@ -47,7 +48,7 @@ import {
   toggle,
   windSector,
 } from './bot/bot-helpers.js'
-import type { AlertRule } from './core/types.js'
+import type { AlertRule, SurfForecast } from './core/types.js'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL =
@@ -721,6 +722,100 @@ bot.command('runnow', async (ctx) => {
   }
 })
 
+bot.command('previewalert', async (ctx) => {
+  if (!isDevChat(ctx.chat.id)) return
+
+  const alert: AlertRule = {
+    id: 'preview-alert',
+    chatId: ctx.chat.id,
+    name: 'Preview Sopelana',
+    spot: 'sopelana',
+    waveMin: 1,
+    waveMax: 4,
+    energyMin: 800,
+    energyMax: 4000,
+    periodMin: 10,
+    periodMax: 16,
+    windRanges: [{ min: 180, max: 260 }],
+    tidePortId: '72',
+    tidePortName: 'Bermeo',
+    tidePreference: 'high',
+    createdAt: new Date().toISOString(),
+  }
+
+  const rows: SurfForecast[] = [
+    {
+      date: '2026-02-19T06:00:00.000Z',
+      spot: 'sopelana',
+      energy: 1500,
+      wind: { speed: 18, angle: 235 },
+      validSwells: [{ angle: 300, height: 1.6, period: 12 }],
+    },
+    {
+      date: '2026-02-19T07:00:00.000Z',
+      spot: 'sopelana',
+      energy: 1800,
+      wind: { speed: 20, angle: 230 },
+      validSwells: [{ angle: 300, height: 1.8, period: 12 }],
+    },
+    {
+      date: '2026-02-19T08:00:00.000Z',
+      spot: 'sopelana',
+      energy: 2100,
+      wind: { speed: 22, angle: 225 },
+      validSwells: [{ angle: 300, height: 2.0, period: 13 }],
+    },
+    {
+      date: '2026-02-19T09:00:00.000Z',
+      spot: 'sopelana',
+      energy: 2400,
+      wind: { speed: 24, angle: 220 },
+      validSwells: [{ angle: 300, height: 2.2, period: 13 }],
+    },
+    {
+      date: '2026-02-19T10:00:00.000Z',
+      spot: 'sopelana',
+      energy: 3000,
+      wind: { speed: 28, angle: 215 },
+      validSwells: [{ angle: 300, height: 2.5, period: 14 }],
+    },
+    {
+      date: '2026-02-19T11:00:00.000Z',
+      spot: 'sopelana',
+      energy: 3400,
+      wind: { speed: 35, angle: 210 },
+      validSwells: [{ angle: 300, height: 2.9, period: 14 }],
+    },
+    {
+      date: '2026-02-19T12:00:00.000Z',
+      spot: 'sopelana',
+      energy: 3900,
+      wind: { speed: 42, angle: 205 },
+      validSwells: [{ angle: 300, height: 3.2, period: 13 }],
+    },
+  ]
+
+  const message = buildAlertMessage({
+    alert,
+    first: rows[2],
+    startDate: new Date(rows[2].date),
+    endDate: new Date(rows[4].date),
+    nearestTides: {
+      high: {
+        date: '2026-02-19',
+        hora: '08:34',
+        altura: 4.35,
+        tipo: 'pleamar',
+      },
+      low: { date: '2026-02-19', hora: '14:44', altura: 0.37, tipo: 'bajamar' },
+    },
+    windowForecasts: rows,
+  })
+
+  await ctx.reply('Preview de notificacion (datos inventados):')
+  await ctx.reply(message, { parse_mode: 'HTML' })
+})
+
 bot.command('alerts_all', async (ctx) => {
   if (!isDevChat(ctx.chat.id)) return
 
@@ -779,65 +874,6 @@ bot.command('listalerts', async (ctx) => {
   }
 })
 
-bot.command('pausealert', async (ctx) => {
-  const id = (ctx.message?.text ?? '').split(' ')[1]?.trim()
-  if (!id) {
-    await ctx.reply('Uso: /pausealert <id>')
-    return
-  }
-
-  const target = listAlerts(ctx.chat.id).find((a) => a.id === id)
-  if (!target) {
-    await ctx.reply('No encontré esa alerta')
-    return
-  }
-
-  if (target.enabled === false) {
-    await ctx.reply('⏸️ Esa alerta ya está pausada')
-    return
-  }
-
-  const updated = setAlertEnabled(ctx.chat.id, id, false)
-  await ctx.reply(updated ? '⏸️ Alerta pausada' : 'No pude pausar la alerta')
-})
-
-bot.command('resumealert', async (ctx) => {
-  const id = (ctx.message?.text ?? '').split(' ')[1]?.trim()
-  if (!id) {
-    await ctx.reply('Uso: /resumealert <id>')
-    return
-  }
-
-  const target = listAlerts(ctx.chat.id).find((a) => a.id === id)
-  if (!target) {
-    await ctx.reply('No encontré esa alerta')
-    return
-  }
-
-  if (target.enabled !== false) {
-    await ctx.reply('▶️ Esa alerta ya está activa')
-    return
-  }
-
-  const updated = setAlertEnabled(ctx.chat.id, id, true)
-  await ctx.reply(
-    updated ? '▶️ Alerta reanudada' : 'No pude reanudar la alerta',
-  )
-})
-
-bot.command('deletealert', async (ctx) => {
-  const id = (ctx.message?.text ?? '').split(' ')[1]?.trim()
-  if (!id) {
-    await ctx.reply('Uso: /deletealert <id>')
-    return
-  }
-  await ctx.reply(
-    deleteAlert(ctx.chat.id, id)
-      ? '🗑️ Alerta borrada'
-      : 'No encontré esa alerta',
-  )
-})
-
 void bot.api.setMyCommands(BOT_COMMANDS).catch(() => {
   // noop
 })
@@ -850,6 +886,7 @@ if (DEV_CHAT_ID) {
         { command: 'status', description: 'Estado del bot' },
         { command: 'checklog', description: 'Últimos check runs' },
         { command: 'runnow', description: 'Forzar check run' },
+        { command: 'previewalert', description: 'Preview de alerta (demo)' },
         { command: 'alerts_all', description: 'Todas las alertas (admin)' },
       ],
       { scope: { type: 'chat', chat_id: DEV_CHAT_ID } },

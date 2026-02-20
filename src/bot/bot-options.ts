@@ -85,15 +85,12 @@ export interface DraftAlert {
 }
 
 export const COMMANDS_HELP =
-  'Comandos:\n/setalert - crear alerta guiada (con botón ⬅️ Atrás en cada paso)\n/listalerts - ver alertas y borrar/pausar/reanudar con botones\n/pausealert <id> - pausar alerta por ID\n/resumealert <id> - reanudar alerta por ID\n/deletealert <id> - borrar alerta por ID\n/cancel - cancelar flujo actual\n/help - ver esta ayuda\n\nMarea en alertas:\n- ANY: sin filtro de marea\n- Alta/Baja: solo horas dentro de ±3h de la marea seleccionada\n- Media: filtro por clase de marea interpolada\n\nNotas:\n- Spot por defecto: sopelana\n- Se evita spam con deduplicación de ventana (si la ventana no cambia, no reenvía)'
+  'Comandos:\n/setalert - crear alerta guiada (con botón ⬅️ Atrás en cada paso)\n/listalerts - ver alertas y borrarlas/pausarlas/reanudarlas con botones\n/cancel - cancelar flujo actual\n/help - ver esta ayuda\n\nMarea en alertas:\n- ANY: sin filtro de marea\n- Alta/Baja: solo horas dentro de ±3h de la marea seleccionada\n- Media: filtro por clase de marea interpolada\n\nNotas:\n- Spot por defecto: sopelana\n- Se evita spam con deduplicación de ventana (si la ventana no cambia, no reenvía)'
 
 export const BOT_COMMANDS = [
   { command: 'start', description: 'Iniciar bot y ver ayuda' },
   { command: 'setalert', description: 'Crear alerta guiada' },
   { command: 'listalerts', description: 'Ver tus alertas' },
-  { command: 'pausealert', description: 'Pausar alerta por ID' },
-  { command: 'resumealert', description: 'Reanudar alerta por ID' },
-  { command: 'deletealert', description: 'Borrar alerta por ID' },
   { command: 'cancel', description: 'Cancelar flujo de creación' },
   { command: 'help', description: 'Mostrar comandos disponibles' },
 ]

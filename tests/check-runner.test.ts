@@ -316,3 +316,34 @@ test('runChecksWithDeps registra match en cada rerun aunque dedupe evite envío'
   assert.equal(sentRecords, 1)
   assert.equal(sent, 1)
 })
+
+test('runChecksWithDeps incluye 4h de contexto y marca horas buenas en tabla', async () => {
+  const sent: string[] = []
+
+  await runChecksWithDeps({
+    alerts: [mkAlert()],
+    minConsecutiveHours: 2,
+    fetchForecasts: async () => [
+      mkForecast('2026-02-16T07:00:00.000Z', 500),
+      mkForecast('2026-02-16T08:00:00.000Z', 500),
+      mkForecast('2026-02-16T09:00:00.000Z', 1200),
+      mkForecast('2026-02-16T10:00:00.000Z', 1200),
+      mkForecast('2026-02-16T11:00:00.000Z', 500),
+      mkForecast('2026-02-16T12:00:00.000Z', 500),
+      mkForecast('2026-02-16T13:00:00.000Z', 500),
+    ],
+    isWithinAlertWindow: async () => true,
+    getTideEventsForDate: async () => mkTides(),
+    apiDateFromForecastDate: () => '20260216',
+    sendMessage: async (_chatId, message) => {
+      sent.push(message)
+    },
+    touchAlertNotified: () => undefined,
+  })
+
+  assert.equal(sent.length, 1)
+  assert.match(sent[0], /🟩\s+10:00\s+\|/)
+  assert.match(sent[0], /🟩\s+11:00\s+\|/)
+  assert.match(sent[0], /⬜\s+08:00\s+\|/)
+  assert.match(sent[0], /⬜\s+14:00\s+\|/)
+})

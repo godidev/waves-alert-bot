@@ -287,7 +287,8 @@ function escapeHtml(value: string): string {
 function formatHourlyTable(
   forecasts: SurfForecast[],
   nearestTides: { low: TideEvent | null; high: TideEvent | null },
-  maxCols = 6,
+  highlightWindow?: { startMs: number; endMs: number },
+  maxCols = 14,
 ): string | null {
   if (!forecasts.length) return null
 
@@ -398,6 +399,14 @@ function formatHourlyTable(
     widths.slice(1).reduce((sum, w) => sum + w, 0) + (widths.length - 2) * 3
 
   const lines: string[] = []
+  const contextPrefix = '⬜ '
+  const tidePrefix = '   '
+  const isGoodHour = (at: number): boolean =>
+    Boolean(
+      highlightWindow &&
+      at >= highlightWindow.startMs &&
+      at <= highlightWindow.endMs,
+    )
   const firstAt = rows[0].at
   const lastAt = rows[rows.length - 1].at
   const beforeRows = tideMarkers.filter((t) => t.at < firstAt)
@@ -407,11 +416,13 @@ function formatHourlyTable(
   const afterRows = tideMarkers.filter((t) => t.at > lastAt)
 
   for (const tide of beforeRows) {
-    lines.push(tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth))
+    lines.push(
+      `${tidePrefix}${tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth)}`,
+    )
   }
 
   if (beforeRows.length) {
-    lines.push(subtleDividerLine(widths[0], rightAreaWidth))
+    lines.push(`${tidePrefix}${subtleDividerLine(widths[0], rightAreaWidth)}`)
   }
 
   let inRangeIdx = 0
@@ -422,25 +433,29 @@ function formatHourlyTable(
     ) {
       const tide = inRangeRows[inRangeIdx]
       lines.push(
-        tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth),
+        `${tidePrefix}${tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth)}`,
       )
       inRangeIdx++
     }
-    lines.push(row.text)
+    lines.push(`${isGoodHour(row.at) ? '🟩 ' : contextPrefix}${row.text}`)
   }
 
   while (inRangeIdx < inRangeRows.length) {
     const tide = inRangeRows[inRangeIdx]
-    lines.push(tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth))
+    lines.push(
+      `${tidePrefix}${tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth)}`,
+    )
     inRangeIdx++
   }
 
   if (afterRows.length) {
-    lines.push(subtleDividerLine(widths[0], rightAreaWidth))
+    lines.push(`${tidePrefix}${subtleDividerLine(widths[0], rightAreaWidth)}`)
   }
 
   for (const tide of afterRows) {
-    lines.push(tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth))
+    lines.push(
+      `${tidePrefix}${tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth)}`,
+    )
   }
 
   const table = [header, separator, ...lines].join('\n')
@@ -467,7 +482,10 @@ export function buildAlertMessage(params: {
   const dayText = formatDay(startDate)
   const startHour = formatHour(startDate)
   const endHour = formatHour(new Date(endDate.getTime() + 60 * 60 * 1000))
-  const hourlyTable = formatHourlyTable(windowForecasts, nearestTides)
+  const hourlyTable = formatHourlyTable(windowForecasts, nearestTides, {
+    startMs: startDate.getTime(),
+    endMs: endDate.getTime(),
+  })
 
   return [
     `🚨🌊 ALERTA: ${alert.name}`,

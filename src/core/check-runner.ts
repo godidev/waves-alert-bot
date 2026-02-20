@@ -238,6 +238,7 @@ export interface CheckRunStats {
 export async function runChecksWithDeps(
   deps: CheckRunnerDeps,
 ): Promise<CheckRunStats> {
+  const contextHours = 4
   const now = deps.nowMs ?? (() => Date.now())
   const forecastsBySpot = new Map<string, SurfForecast[]>()
   const stats: CheckRunStats = {
@@ -315,6 +316,17 @@ export async function runChecksWithDeps(
         startMs: startDate.getTime(),
         endMs: endDate.getTime() + 60 * 60 * 1000,
       }
+
+      const orderedForecasts = [...forecasts]
+        .filter((f) => Number.isFinite(new Date(f.date).getTime()))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+      const tableStartMs = startDate.getTime() - contextHours * 60 * 60 * 1000
+      const tableEndMs = endDate.getTime() + contextHours * 60 * 60 * 1000
+      const tableForecasts = orderedForecasts.filter((f) => {
+        const at = new Date(f.date).getTime()
+        return at >= tableStartMs && at <= tableEndMs
+      })
       const windowStartIso = new Date(newWindow.startMs).toISOString()
       const windowEndIso = new Date(newWindow.endMs).toISOString()
       const matchedAtIso = new Date(now()).toISOString()
@@ -345,7 +357,9 @@ export async function runChecksWithDeps(
         startDate,
         endDate,
         nearestTides,
-        windowForecasts: window.items.map((i) => i.forecast),
+        windowForecasts: tableForecasts.length
+          ? tableForecasts
+          : window.items.map((i) => i.forecast),
       })
 
       await deps.sendMessage(alert.chatId, message)

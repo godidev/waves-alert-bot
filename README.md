@@ -29,8 +29,9 @@ npm start
 - `/start`
 - `/setalert` (modo guiado paso a paso)
 - `/listalerts`
-- `/deletealert <id>`
 - `/cancel`
+
+`/listalerts` incluye botones inline para pausar/reanudar y borrar alertas.
 
 ## Flujo guiado `/setalert`
 1. Nombre de alerta
