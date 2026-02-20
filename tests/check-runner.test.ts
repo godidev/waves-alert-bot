@@ -344,6 +344,6 @@ test('runChecksWithDeps incluye 4h de contexto y marca horas buenas en tabla', a
   assert.equal(sent.length, 1)
   assert.match(sent[0], /🟩\s+10:00\s+\|/)
   assert.match(sent[0], /🟩\s+11:00\s+\|/)
-  assert.match(sent[0], /⬜\s+08:00\s+\|/)
-  assert.match(sent[0], /⬜\s+14:00\s+\|/)
+  assert.match(sent[0], /⬜(?:\uFE0F)?\s+08:00\s+\|/)
+  assert.match(sent[0], /⬜(?:\uFE0F)?\s+14:00\s+\|/)
 })

@@ -196,6 +196,7 @@ function formatHour(date: Date): string {
 }
 
 function tideBandLine(
+  marker: string,
   label: 'Marea alta' | 'Marea baja',
   event: TideEvent,
   hourWidth: number,
@@ -204,7 +205,7 @@ function tideBandLine(
   const icon = label === 'Marea alta' ? '⬆️' : '⬇️'
   const tideAt = parseTideDate(event)
   const hourText = tideAt ? formatHour(tideAt) : event.hora
-  const hour = padEndDisplay(hourText, hourWidth)
+  const hour = padEndDisplay(`${marker} ${hourText}`, hourWidth)
   const rightText = `${icon} ${label} (${event.altura.toFixed(2)}m)`
   const right = padCenterDisplay(rightText, rightWidth)
   return `${hour} | ${right}`
@@ -248,6 +249,7 @@ function charDisplayWidth(ch: string): number {
     (cp >= 0xfe30 && cp <= 0xfe6f) ||
     (cp >= 0xff00 && cp <= 0xff60) ||
     (cp >= 0xffe0 && cp <= 0xffe6) ||
+    (cp >= 0x2b00 && cp <= 0x2bff) ||
     (cp >= 0x1f300 && cp <= 0x1faff)
   ) {
     return 2
@@ -292,6 +294,9 @@ function formatHourlyTable(
 ): string | null {
   if (!forecasts.length) return null
 
+  const GOOD_MARKER = '🟩'
+  const CONTEXT_MARKER = '⬜️'
+
   const slice = [...forecasts]
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, maxCols)
@@ -299,7 +304,16 @@ function formatHourlyTable(
   const columns = [
     {
       header: 'Hora',
-      values: slice.map((f) => formatHour(new Date(f.date))),
+      values: slice.map((f) => {
+        const at = new Date(f.date).getTime()
+        const marker =
+          highlightWindow &&
+          at >= highlightWindow.startMs &&
+          at <= highlightWindow.endMs
+            ? GOOD_MARKER
+            : CONTEXT_MARKER
+        return `${marker} ${formatHour(new Date(f.date))}`
+      }),
     },
     {
       header: 'm',
@@ -399,14 +413,16 @@ function formatHourlyTable(
     widths.slice(1).reduce((sum, w) => sum + w, 0) + (widths.length - 2) * 3
 
   const lines: string[] = []
-  const contextPrefix = '⬜ '
-  const tidePrefix = '   '
-  const isGoodHour = (at: number): boolean =>
-    Boolean(
+  const tideMarker = (at: number): string => {
+    if (
       highlightWindow &&
       at >= highlightWindow.startMs &&
-      at <= highlightWindow.endMs,
-    )
+      at <= highlightWindow.endMs
+    ) {
+      return GOOD_MARKER
+    }
+    return CONTEXT_MARKER
+  }
   const firstAt = rows[0].at
   const lastAt = rows[rows.length - 1].at
   const beforeRows = tideMarkers.filter((t) => t.at < firstAt)
@@ -417,12 +433,18 @@ function formatHourlyTable(
 
   for (const tide of beforeRows) {
     lines.push(
-      `${tidePrefix}${tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth)}`,
+      tideBandLine(
+        tideMarker(tide.at),
+        tide.label,
+        tide.event,
+        widths[0],
+        rightAreaWidth,
+      ),
     )
   }
 
   if (beforeRows.length) {
-    lines.push(`${tidePrefix}${subtleDividerLine(widths[0], rightAreaWidth)}`)
+    lines.push(subtleDividerLine(widths[0], rightAreaWidth))
   }
 
   let inRangeIdx = 0
@@ -433,28 +455,46 @@ function formatHourlyTable(
     ) {
       const tide = inRangeRows[inRangeIdx]
       lines.push(
-        `${tidePrefix}${tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth)}`,
+        tideBandLine(
+          tideMarker(tide.at),
+          tide.label,
+          tide.event,
+          widths[0],
+          rightAreaWidth,
+        ),
       )
       inRangeIdx++
     }
-    lines.push(`${isGoodHour(row.at) ? '🟩 ' : contextPrefix}${row.text}`)
+    lines.push(row.text)
   }
 
   while (inRangeIdx < inRangeRows.length) {
     const tide = inRangeRows[inRangeIdx]
     lines.push(
-      `${tidePrefix}${tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth)}`,
+      tideBandLine(
+        tideMarker(tide.at),
+        tide.label,
+        tide.event,
+        widths[0],
+        rightAreaWidth,
+      ),
     )
     inRangeIdx++
   }
 
   if (afterRows.length) {
-    lines.push(`${tidePrefix}${subtleDividerLine(widths[0], rightAreaWidth)}`)
+    lines.push(subtleDividerLine(widths[0], rightAreaWidth))
   }
 
   for (const tide of afterRows) {
     lines.push(
-      `${tidePrefix}${tideBandLine(tide.label, tide.event, widths[0], rightAreaWidth)}`,
+      tideBandLine(
+        tideMarker(tide.at),
+        tide.label,
+        tide.event,
+        widths[0],
+        rightAreaWidth,
+      ),
     )
   }
 
