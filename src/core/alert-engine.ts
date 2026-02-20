@@ -320,7 +320,7 @@ function formatHourlyTable(
       values: slice.map((f) => totalWaveHeight(f).toFixed(1)),
     },
     {
-      header: 'E',
+      header: 'E(kJ)',
       values: slice.map((f) => `${Math.round(f.energy)}`),
     },
     {

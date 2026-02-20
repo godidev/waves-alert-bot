@@ -149,7 +149,7 @@ test('buildAlertMessage() usa nuevo formato de fecha/rango/empieza y mareas cerc
   assert.doesNotMatch(msg, /Coincidencia/)
   assert.match(
     msg,
-    /<pre>[\s\S]*Hora\s+\|\s+m\s+\|\s+E\s+\|\s+V\(km\/h\)\s+\|\s+T\(s\)[\s\S]*<\/pre>/,
+    /<pre>[\s\S]*Hora\s+\|\s+m\s+\|\s+E\(kJ\)\s+\|\s+V\(km\/h\)\s+\|\s+T\(s\)[\s\S]*<\/pre>/,
   )
   assert.match(msg, /13:30\s+\|\s+⬆️ Marea alta \(3.20m\)/)
   assert.match(msg, /08:00\s+\|\s+⬇️ Marea baja \(0.80m\)/)
