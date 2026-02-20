@@ -97,19 +97,21 @@ function estimateTideHeightAt(
   return null
 }
 
-function findNearestHighTideTs(
+function findNearestTideTsByType(
   target: Date,
   events: TideEvent[],
+  type: 'high' | 'low',
 ): number | null {
   const t = target.getTime()
   let best: number | null = null
   let bestDiff = Number.POSITIVE_INFINITY
+  const needle = type === 'high' ? 'pleamar' : 'bajamar'
 
   for (const e of events) {
     if (
       !String(e.tipo || '')
         .toLowerCase()
-        .includes('pleamar')
+        .includes(needle)
     )
       continue
     const atDate = parseUtcDateTime(e.date, e.hora)
@@ -168,15 +170,19 @@ async function buildCandidateMatches(
     const yyyymmdd = deps.apiDateFromForecastDate(candidate.date)
     const tideEvents = await deps.getTideEventsForDate(tidePortId, yyyymmdd)
 
-    if (alert.tidePreference === 'high') {
-      const nearestHigh = findNearestHighTideTs(targetDate, tideEvents)
-      if (!nearestHigh) {
+    if (alert.tidePreference === 'high' || alert.tidePreference === 'low') {
+      const nearestTide = findNearestTideTsByType(
+        targetDate,
+        tideEvents,
+        alert.tidePreference,
+      )
+      if (!nearestTide) {
         stats.discardReasons.tide++
         continue
       }
 
-      const start = nearestHigh - 3 * 60 * 60 * 1000
-      const end = nearestHigh + 3 * 60 * 60 * 1000
+      const start = nearestTide - 3 * 60 * 60 * 1000
+      const end = nearestTide + 3 * 60 * 60 * 1000
       const ts = targetDate.getTime()
       if (ts < start || ts > end) {
         stats.discardReasons.tide++
@@ -197,7 +203,7 @@ async function buildCandidateMatches(
       }
     }
 
-    if (alert.tidePreference && alert.tidePreference !== 'any') {
+    if (alert.tidePreference === 'mid') {
       if (!tideClass || tideClass !== alert.tidePreference) {
         stats.discardReasons.tide++
         continue

@@ -63,9 +63,10 @@ Por combinación `chat_id + spot + perfil` se guarda última ventana enviada:
 
 > Caché en memoria (no persistente).
 
-### Marea alta (`tidePreference = high`)
-- Busca la pleamar más próxima.
-- Aplica ventana teórica `pleamar ±3h`.
+### Marea seleccionada (`tidePreference = high|low`)
+- Si eliges `high`, busca la pleamar más próxima.
+- Si eliges `low`, busca la bajamar más próxima.
+- Aplica ventana teórica `marea seleccionada ±3h`.
 - Solo evalúa registros dentro de esa ventana.
 - Intersecta con condiciones de olas/viento/energía.
 - Si no queda intersección, no se envía alerta.

@@ -184,6 +184,48 @@ test('runChecksWithDeps marea alta interpreta horas de marea en UTC', async () =
   assert.equal(sent, 0)
 })
 
+test('runChecksWithDeps marea alta usa ventana ±3h sin exigir clase alta', async () => {
+  let sent = 0
+
+  await runChecksWithDeps({
+    alerts: [mkAlert({ tidePreference: 'high' })],
+    minConsecutiveHours: 1,
+    fetchForecasts: async () => [mkForecast('2026-02-16T15:00:00.000Z')],
+    isWithinAlertWindow: async () => true,
+    getTideEventsForDate: async () => mkTides(),
+    apiDateFromForecastDate: () => '20260216',
+    sendMessage: async () => {
+      sent++
+    },
+    touchAlertNotified: () => undefined,
+  })
+
+  // Pleamar 12:30 -> ventana 09:30..15:30, por tanto 15:00 entra.
+  // Aunque la clase estimada no sea "high", debe enviar por regla de ventana.
+  assert.equal(sent, 1)
+})
+
+test('runChecksWithDeps marea baja: filtra fuera de ventana ±3h de bajamar', async () => {
+  let sent = 0
+
+  await runChecksWithDeps({
+    alerts: [mkAlert({ tidePreference: 'low' })],
+    minConsecutiveHours: 1,
+    fetchForecasts: async () => [mkForecast('2026-02-16T12:00:00.000Z')],
+    isWithinAlertWindow: async () => true,
+    getTideEventsForDate: async () => mkTides(),
+    apiDateFromForecastDate: () => '20260216',
+    sendMessage: async () => {
+      sent++
+    },
+    touchAlertNotified: () => undefined,
+  })
+
+  // Bajamar más próxima 07:00 -> ventana 04:00..10:00.
+  // El forecast 12:00 queda fuera.
+  assert.equal(sent, 0)
+})
+
 test('runChecksWithDeps cachea forecasts por spot en cada ejecución', async () => {
   let fetchCalls = 0
   let sent = 0
