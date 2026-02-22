@@ -288,7 +288,7 @@ export async function fetchForecasts(
   apiUrl: string,
   spot: string,
 ): Promise<SurfForecast[]> {
-  const url = `${apiUrl}/surf-forecast/${encodeURIComponent(spot)}`
+  const url = `${apiUrl}/surf-forecast/${encodeURIComponent(spot)}/hourly`
   const res = await fetchWithTimeout(url)
   if (!res || !res.ok) return []
   return (await res.json()) as SurfForecast[]

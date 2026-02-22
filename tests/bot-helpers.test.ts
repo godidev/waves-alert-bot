@@ -55,8 +55,10 @@ test('draftToAlert devuelve null si falta una selección requerida', () => {
 test('fetchForecasts usa signal y degrada a [] cuando fetch falla', async () => {
   const originalFetch = globalThis.fetch
   let signalSeen = false
+  let urlSeen = ''
 
-  globalThis.fetch = (async (_input, init) => {
+  globalThis.fetch = (async (input, init) => {
+    urlSeen = String(input)
     signalSeen = init?.signal instanceof AbortSignal
     throw new Error('network error')
   }) as typeof fetch
@@ -68,6 +70,10 @@ test('fetchForecasts usa signal y degrada a [] cuando fetch falla', async () => 
     )
     assert.deepEqual(forecasts, [])
     assert.equal(signalSeen, true)
+    assert.equal(
+      urlSeen,
+      'https://backend.invalid/surf-forecast/sopelana/hourly',
+    )
   } finally {
     globalThis.fetch = originalFetch
   }
