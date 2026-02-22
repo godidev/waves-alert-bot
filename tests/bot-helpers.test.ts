@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   draftToAlert,
   fetchForecasts,
+  fetchSpots,
   getTideEventsForDate,
 } from '../src/bot/bot-helpers.js'
 import type { DraftAlert } from '../src/bot/bot-options.js'
@@ -92,6 +93,42 @@ test('getTideEventsForDate usa signal y degrada a [] cuando fetch falla', async 
     const tides = await getTideEventsForDate('72', '20260217')
     assert.deepEqual(tides, [])
     assert.equal(signalSeen, true)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('fetchSpots usa endpoint dedicado y devuelve strings únicos', async () => {
+  const originalFetch = globalThis.fetch
+  let urlSeen = ''
+
+  globalThis.fetch = (async (input) => {
+    urlSeen = String(input)
+    return {
+      ok: true,
+      json: async () => ['sopelana', 'mundaka', 'Sopelana', '', 123],
+    } as Response
+  }) as typeof fetch
+
+  try {
+    const spots = await fetchSpots('https://backend.invalid')
+    assert.equal(urlSeen, 'https://backend.invalid/surf-forecast/spots')
+    assert.deepEqual(spots, ['sopelana', 'mundaka'])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('fetchSpots degrada a [] cuando fetch falla', async () => {
+  const originalFetch = globalThis.fetch
+
+  globalThis.fetch = (async () => {
+    throw new Error('network error')
+  }) as typeof fetch
+
+  try {
+    const spots = await fetchSpots('https://backend.invalid')
+    assert.deepEqual(spots, [])
   } finally {
     globalThis.fetch = originalFetch
   }

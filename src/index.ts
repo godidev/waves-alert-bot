@@ -33,6 +33,7 @@ import {
   confirmKeyboard,
   keyboardFromOptions,
   safeEditReplyMarkup,
+  spotsKeyboard,
   tidePortKeyboard,
   tidePreferenceKeyboard,
   windKeyboard,
@@ -42,6 +43,7 @@ import {
   apiDateFromForecastDate,
   draftToAlert,
   fetchForecasts,
+  fetchSpots,
   getTideEventsForDate,
   isWithinAlertWindow,
   tideTag,
@@ -57,10 +59,13 @@ const MIN_CONSECUTIVE_HOURS = Number(process.env.MIN_CONSECUTIVE_HOURS ?? 2)
 const DEV_CHAT_ID = process.env.DEV_CHAT_ID
   ? Number(process.env.DEV_CHAT_ID)
   : undefined
+const SPOTS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 const drafts = new Map<number, DraftAlert>()
 const lastSentWindows = new Map<string, AlertWindow>()
 const startedAt = Date.now()
+let cachedSpotOptions: string[] | null = null
+let spotOptionsExpireAtMs = 0
 
 function isDevChat(chatId: number): boolean {
   return DEV_CHAT_ID !== undefined && chatId === DEV_CHAT_ID
@@ -115,6 +120,44 @@ async function runChecks(): Promise<void> {
     durationMs: Date.now() - start,
     discardReasons: stats.discardReasons,
   })
+}
+
+function normalizeSpots(spots: string[]): string[] {
+  const seen = new Set<string>()
+  const normalized: string[] = []
+
+  for (const raw of spots) {
+    const spot = raw.trim()
+    if (!spot) continue
+    const key = spot.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    normalized.push(spot)
+  }
+
+  if (!normalized.length) return [DEFAULT_SPOT]
+  if (normalized.some((spot) => spot.toLowerCase() === DEFAULT_SPOT)) {
+    return normalized
+  }
+
+  return [DEFAULT_SPOT, ...normalized]
+}
+
+async function loadSpotOptions(): Promise<string[]> {
+  const nowMs = Date.now()
+  if (cachedSpotOptions && nowMs < spotOptionsExpireAtMs) {
+    return cachedSpotOptions
+  }
+
+  const backendSpots = await fetchSpots(API_URL)
+  if (backendSpots.length) {
+    const normalized = normalizeSpots(backendSpots)
+    cachedSpotOptions = normalized
+    spotOptionsExpireAtMs = nowMs + SPOTS_CACHE_TTL_MS
+    return normalized
+  }
+
+  return cachedSpotOptions ?? [DEFAULT_SPOT]
 }
 
 async function flowReply<TExtra>(
@@ -233,11 +276,14 @@ bot.on('message:text', async (ctx, next) => {
   }
 
   d.name = text
-  d.step = 'wave'
+  d.step = 'spot'
 
-  await flowReply(ctx, d, `Spot fijo: ${DEFAULT_SPOT}`)
-  await flowReply(ctx, d, 'Elige una o varias alturas:', {
-    reply_markup: keyboardFromOptions('wave', WAVE_OPTIONS, [], true, true),
+  const spots = await loadSpotOptions()
+  d.availableSpots = spots
+  if (!spots.includes(d.spot)) d.spot = spots[0] ?? DEFAULT_SPOT
+
+  await flowReply(ctx, d, 'Elige spot para esta alerta:', {
+    reply_markup: spotsKeyboard(spots, d.spot, true),
   })
 })
 
@@ -320,11 +366,65 @@ bot.on('callback_query:data', async (ctx) => {
     return
   }
 
-  if (prefix === 'wave') {
+  if (prefix === 'spot') {
     if (value === 'BACK') {
       d.step = 'name'
       await ctx.answerCallbackQuery({ text: 'Paso anterior' })
       await flowReply(ctx, d, 'Pon un nombre para la alerta:')
+      return
+    }
+
+    if (value === 'DONE') {
+      const options = d.availableSpots?.length
+        ? d.availableSpots
+        : await loadSpotOptions()
+      d.availableSpots = options
+      if (!options.includes(d.spot)) {
+        await ctx.answerCallbackQuery({ text: 'Elige un spot válido' })
+        return
+      }
+
+      d.step = 'wave'
+      await ctx.answerCallbackQuery({ text: 'OK' })
+      await flowReply(ctx, d, 'Elige una o varias alturas:', {
+        reply_markup: keyboardFromOptions('wave', WAVE_OPTIONS, [], true, true),
+      })
+      return
+    }
+
+    if (!value) {
+      await ctx.answerCallbackQuery({ text: 'Spot inválido' })
+      return
+    }
+
+    const selectedSpot = decodeURIComponent(value)
+    const options = d.availableSpots?.length
+      ? d.availableSpots
+      : await loadSpotOptions()
+    d.availableSpots = options
+
+    if (!options.includes(selectedSpot)) {
+      await ctx.answerCallbackQuery({ text: 'Spot inválido' })
+      return
+    }
+
+    d.spot = selectedSpot
+    await ctx.answerCallbackQuery({ text: `Spot: ${selectedSpot}` })
+    await safeEditReplyMarkup(ctx, spotsKeyboard(options, d.spot, true))
+    return
+  }
+
+  if (prefix === 'wave') {
+    if (value === 'BACK') {
+      d.step = 'spot'
+      const options = d.availableSpots?.length
+        ? d.availableSpots
+        : await loadSpotOptions()
+      d.availableSpots = options
+      await ctx.answerCallbackQuery({ text: 'Paso anterior' })
+      await flowReply(ctx, d, 'Elige spot para esta alerta:', {
+        reply_markup: spotsKeyboard(options, d.spot, true),
+      })
       return
     }
 

@@ -4,6 +4,7 @@ export const DEFAULT_SPOT = 'sopelana'
 
 export type Step =
   | 'name'
+  | 'spot'
   | 'wave'
   | 'energy'
   | 'period'
@@ -74,6 +75,7 @@ export interface DraftAlert {
   step: Step
   name?: string
   spot: string
+  availableSpots?: string[]
   waveSelected: string[]
   periodSelected: string[]
   energySelected: string[]
@@ -85,7 +87,7 @@ export interface DraftAlert {
 }
 
 export const COMMANDS_HELP =
-  'Comandos:\n/setalert - crear alerta guiada (con botón ⬅️ Atrás en cada paso)\n/listalerts - ver alertas y borrarlas/pausarlas/reanudarlas con botones\n/cancel - cancelar flujo actual\n/help - ver esta ayuda\n\nMarea en alertas:\n- ANY: sin filtro de marea\n- Alta/Baja: solo horas dentro de ±3h de la marea seleccionada\n- Media: filtro por clase de marea interpolada\n\nNotas:\n- Spot por defecto: sopelana\n- Se evita spam con deduplicación de ventana (si la ventana no cambia, no reenvía)'
+  'Comandos:\n/setalert - crear alerta guiada (con botón ⬅️ Atrás en cada paso)\n/listalerts - ver alertas y borrarlas/pausarlas/reanudarlas con botones\n/cancel - cancelar flujo actual\n/help - ver esta ayuda\n\nMarea en alertas:\n- ANY: sin filtro de marea\n- Alta/Baja: solo horas dentro de ±3h de la marea seleccionada\n- Media: filtro por clase de marea interpolada\n\nNotas:\n- Spot seleccionable desde el backend (/surf-forecast/spots)\n- Se evita spam con deduplicación de ventana (si la ventana no cambia, no reenvía)'
 
 export const BOT_COMMANDS = [
   { command: 'start', description: 'Iniciar bot y ver ayuda' },

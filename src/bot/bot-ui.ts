@@ -48,6 +48,21 @@ export function keyboardFromOptions(
   return kb
 }
 
+export function spotsKeyboard(
+  spots: string[],
+  selected: string,
+  allowBack = false,
+): InlineKeyboard {
+  const kb = new InlineKeyboard()
+  spots.forEach((spot) => {
+    const prefix = spot === selected ? '✅ ' : ''
+    kb.text(`${prefix}${spot}`, `spot:${encodeURIComponent(spot)}`).row()
+  })
+  kb.text('✅ Confirmar', 'spot:DONE')
+  if (allowBack) kb.text('⬅️ Atrás', 'spot:BACK')
+  return kb
+}
+
 export function windKeyboard(
   selected: string[],
   allowBack = false,

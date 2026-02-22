@@ -35,13 +35,14 @@ npm start
 
 ## Flujo guiado `/setalert`
 1. Nombre de alerta
-2. Altura (selección múltiple por valores)
-3. Energía (preset: baja/media/alta/muy alta)
-4. Periodo (selección múltiple por rangos desde 8s)
-5. Viento (8 opciones: N/NE/E/SE/S/SW/W/NW, selección múltiple o ANY)
-6. Puerto de marea (Bermeo/Bilbao)
-7. Preferencia de marea (ANY/Baja/Media/Alta)
-8. Confirmación
+2. Spot (lista dinámica desde backend en `/surf-forecast/spots`)
+3. Altura (selección múltiple por valores)
+4. Energía (preset: baja/media/alta/muy alta)
+5. Periodo (selección múltiple por rangos desde 8s)
+6. Viento (8 opciones: N/NE/E/SE/S/SW/W/NW, selección múltiple o ANY)
+7. Puerto de marea (Bermeo/Bilbao)
+8. Preferencia de marea (ANY/Baja/Media/Alta)
+9. Confirmación
 
 Al terminar, el bot limpia los mensajes intermedios del wizard y deja solo la confirmación final.
 
@@ -51,7 +52,7 @@ Al terminar, el bot limpia los mensajes intermedios del wizard y deja solo la co
 - Si el bot arranca en otro minuto, calcula automáticamente el siguiente `HH:10`.
 
 ## Lógica de alertas
-- Spot fijo por ahora: `sopelana`.
+- Spot seleccionable en el wizard (si falla backend, fallback a `sopelana`).
 - Ventana de luz: desde las 05:00 hasta 1h después de la puesta de sol (hora local).
 - Solo alerta cuando hay una racha mínima de horas consecutivas cumpliendo condiciones (`MIN_CONSECUTIVE_HOURS`, default `2`).
 - **Sin cooldown temporal**: el control anti-spam se hace por deduplicación de ventana.

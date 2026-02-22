@@ -293,3 +293,26 @@ export async function fetchForecasts(
   if (!res || !res.ok) return []
   return (await res.json()) as SurfForecast[]
 }
+
+export async function fetchSpots(apiUrl: string): Promise<string[]> {
+  const url = `${apiUrl}/surf-forecast/spots`
+  const res = await fetchWithTimeout(url)
+  if (!res || !res.ok) return []
+
+  const json = (await res.json()) as unknown
+  if (!Array.isArray(json)) return []
+
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const item of json) {
+    if (typeof item !== 'string') continue
+    const spot = item.trim()
+    if (!spot) continue
+    const dedupeKey = spot.toLowerCase()
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    out.push(spot)
+  }
+
+  return out
+}
