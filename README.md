@@ -35,7 +35,7 @@ npm start
 
 ## Flujo guiado `/setalert`
 1. Nombre de alerta
-2. Spot (lista dinámica desde backend en `/surf-forecast/spots`)
+2. Spot (lista dinámica desde backend en `/spots`)
 3. Altura (selección múltiple por valores)
 4. Energía (preset: baja/media/alta/muy alta)
 5. Periodo (selección múltiple por rangos desde 8s)

@@ -20,7 +20,6 @@ import { buildCleanupDeleteList } from './bot/flow-cleanup.js'
 import {
   BOT_COMMANDS,
   COMMANDS_HELP,
-  DEFAULT_SPOT,
   ENERGY_OPTIONS,
   PERIOD_OPTIONS,
   TIDE_PORT_OPTIONS,
@@ -42,6 +41,7 @@ import {
   alertSummaryText,
   apiDateFromForecastDate,
   draftToAlert,
+  deriveOptimalSelections,
   fetchForecasts,
   fetchSpots,
   getTideEventsForDate,
@@ -50,7 +50,7 @@ import {
   toggle,
   windSector,
 } from './bot/bot-helpers.js'
-import type { AlertRule, SurfForecast } from './core/types.js'
+import type { AlertRule, SpotOption, SurfForecast } from './core/types.js'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const API_URL =
@@ -64,7 +64,7 @@ const SPOTS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const drafts = new Map<number, DraftAlert>()
 const lastSentWindows = new Map<string, AlertWindow>()
 const startedAt = Date.now()
-let cachedSpotOptions: string[] | null = null
+let cachedSpotOptions: SpotOption[] | null = null
 let spotOptionsExpireAtMs = 0
 
 function isDevChat(chatId: number): boolean {
@@ -122,28 +122,23 @@ async function runChecks(): Promise<void> {
   })
 }
 
-function normalizeSpots(spots: string[]): string[] {
+function normalizeSpots(spots: SpotOption[]): SpotOption[] {
   const seen = new Set<string>()
-  const normalized: string[] = []
+  const normalized: SpotOption[] = []
 
-  for (const raw of spots) {
-    const spot = raw.trim()
-    if (!spot) continue
-    const key = spot.toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    normalized.push(spot)
+  for (const spot of spots) {
+    const spotId = spot.spotId.trim()
+    const spotName = spot.spotName.trim()
+    if (!spotId || !spotName) continue
+    if (seen.has(spotId)) continue
+    seen.add(spotId)
+    normalized.push({ ...spot, spotId, spotName })
   }
 
-  if (!normalized.length) return [DEFAULT_SPOT]
-  if (normalized.some((spot) => spot.toLowerCase() === DEFAULT_SPOT)) {
-    return normalized
-  }
-
-  return [DEFAULT_SPOT, ...normalized]
+  return normalized
 }
 
-async function loadSpotOptions(): Promise<string[]> {
+async function loadSpotOptions(): Promise<SpotOption[]> {
   const nowMs = Date.now()
   if (cachedSpotOptions && nowMs < spotOptionsExpireAtMs) {
     return cachedSpotOptions
@@ -157,7 +152,7 @@ async function loadSpotOptions(): Promise<string[]> {
     return normalized
   }
 
-  return cachedSpotOptions ?? [DEFAULT_SPOT]
+  return cachedSpotOptions ?? []
 }
 
 async function flowReply<TExtra>(
@@ -238,7 +233,8 @@ bot.command('help', async (ctx) => {
 bot.command('setalert', async (ctx) => {
   drafts.set(ctx.chat.id, {
     step: 'name',
-    spot: DEFAULT_SPOT,
+    spotId: '',
+    spot: '',
     waveSelected: [],
     energySelected: [],
     periodSelected: [],
@@ -279,11 +275,33 @@ bot.on('message:text', async (ctx, next) => {
   d.step = 'spot'
 
   const spots = await loadSpotOptions()
+  if (!spots.length) {
+    await flowReply(
+      ctx,
+      d,
+      'No hay spots activos disponibles ahora mismo. Intentalo mas tarde.',
+    )
+    drafts.delete(ctx.chat.id)
+    return
+  }
+
   d.availableSpots = spots
-  if (!spots.includes(d.spot)) d.spot = spots[0] ?? DEFAULT_SPOT
+  if (!spots.some((spot) => spot.spotId === d.spotId)) {
+    d.spotId = spots[0]?.spotId ?? ''
+    d.spot = spots[0]?.spotName ?? ''
+  }
+
+  const selectedSpot = spots.find((spot) => spot.spotId === d.spotId)
+  if (selectedSpot) {
+    const optimal = deriveOptimalSelections(selectedSpot)
+    d.periodSelected = optimal.periodSelected
+    d.windSelected = optimal.windSelected
+    d.spotOptimalPeriodRange = optimal.periodRange
+    d.spotOptimalWindRange = optimal.windRange
+  }
 
   await flowReply(ctx, d, 'Elige spot para esta alerta:', {
-    reply_markup: spotsKeyboard(spots, d.spot, true),
+    reply_markup: spotsKeyboard(spots, d.spotId, true),
   })
 })
 
@@ -379,7 +397,7 @@ bot.on('callback_query:data', async (ctx) => {
         ? d.availableSpots
         : await loadSpotOptions()
       d.availableSpots = options
-      if (!options.includes(d.spot)) {
+      if (!options.some((spot) => spot.spotId === d.spotId)) {
         await ctx.answerCallbackQuery({ text: 'Elige un spot válido' })
         return
       }
@@ -397,20 +415,27 @@ bot.on('callback_query:data', async (ctx) => {
       return
     }
 
-    const selectedSpot = decodeURIComponent(value)
+    const selectedSpotId = decodeURIComponent(value)
     const options = d.availableSpots?.length
       ? d.availableSpots
       : await loadSpotOptions()
     d.availableSpots = options
 
-    if (!options.includes(selectedSpot)) {
+    const selectedSpot = options.find((spot) => spot.spotId === selectedSpotId)
+    if (!selectedSpot) {
       await ctx.answerCallbackQuery({ text: 'Spot inválido' })
       return
     }
 
-    d.spot = selectedSpot
-    await ctx.answerCallbackQuery({ text: `Spot: ${selectedSpot}` })
-    await safeEditReplyMarkup(ctx, spotsKeyboard(options, d.spot, true))
+    d.spotId = selectedSpot.spotId
+    d.spot = selectedSpot.spotName
+    const optimal = deriveOptimalSelections(selectedSpot)
+    d.periodSelected = optimal.periodSelected
+    d.windSelected = optimal.windSelected
+    d.spotOptimalPeriodRange = optimal.periodRange
+    d.spotOptimalWindRange = optimal.windRange
+    await ctx.answerCallbackQuery({ text: `Spot: ${selectedSpot.spotName}` })
+    await safeEditReplyMarkup(ctx, spotsKeyboard(options, d.spotId, true))
     return
   }
 
@@ -423,7 +448,7 @@ bot.on('callback_query:data', async (ctx) => {
       d.availableSpots = options
       await ctx.answerCallbackQuery({ text: 'Paso anterior' })
       await flowReply(ctx, d, 'Elige spot para esta alerta:', {
-        reply_markup: spotsKeyboard(options, d.spot, true),
+        reply_markup: spotsKeyboard(options, d.spotId, true),
       })
       return
     }
@@ -829,6 +854,7 @@ bot.command('previewalert', async (ctx) => {
     id: 'preview-alert',
     chatId: ctx.chat.id,
     name: 'Preview Sopelana',
+    spotId: 'preview-sopelana-id',
     spot: 'sopelana',
     waveMin: 1,
     waveMax: 4,

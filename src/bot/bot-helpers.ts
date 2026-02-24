@@ -8,7 +8,12 @@ import {
   WIND_SECTORS,
 } from './bot-options.js'
 import { nextId } from '../core/utils.js'
-import type { AlertRule, SurfForecast, Range } from '../core/types.js'
+import type {
+  AlertRule,
+  SpotOption,
+  SurfForecast,
+  Range,
+} from '../core/types.js'
 
 const MAX_CACHE_ENTRIES = 100
 const DEFAULT_FETCH_TIMEOUT_MS = 10_000
@@ -103,17 +108,105 @@ function envelopeWind(ranges: Range[]): { min: number; max: number } {
   }
 }
 
+function rangesOverlap(a: Range, b: Range): boolean {
+  return a.min <= b.max && b.min <= a.max
+}
+
+function splitCircularRange(range: Range): Range[] {
+  if (range.min <= range.max) return [range]
+  return [
+    { min: range.min, max: 360 },
+    { min: 0, max: range.max },
+  ]
+}
+
+function circularRangesOverlap(a: Range, b: Range): boolean {
+  const partsA = splitCircularRange(a)
+  const partsB = splitCircularRange(b)
+  return partsA.some((pa) => partsB.some((pb) => rangesOverlap(pa, pb)))
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
+function parseRange(value: unknown): Range | null {
+  if (!value || typeof value !== 'object') return null
+  const min = toNumberOrNull((value as { min?: unknown }).min)
+  const max = toNumberOrNull((value as { max?: unknown }).max)
+  if (min == null || max == null) return null
+  return { min, max }
+}
+
+function parseSpotOptimalConditions(
+  input: unknown,
+): SpotOption['optimalConditions'] {
+  if (!input || typeof input !== 'object') return undefined
+
+  const raw = input as {
+    period?: unknown
+    wind?: unknown
+    periodRange?: unknown
+    windRange?: unknown
+  }
+  const period = parseRange(raw.period ?? raw.periodRange)
+  const wind = parseRange(raw.wind ?? raw.windRange)
+
+  if (!period && !wind) return undefined
+  return { period: period ?? undefined, wind: wind ?? undefined }
+}
+
+export function deriveOptimalSelections(spot: SpotOption): {
+  periodSelected: string[]
+  windSelected: string[]
+  periodRange?: Range
+  windRange?: Range
+} {
+  const periodRange = spot.optimalConditions?.period
+  const windRange = spot.optimalConditions?.wind
+
+  const periodSelected = periodRange
+    ? PERIOD_OPTIONS.filter((opt) =>
+        rangesOverlap({ min: opt.min, max: opt.max }, periodRange),
+      ).map((opt) => opt.id)
+    : []
+
+  const windSelected = windRange
+    ? WIND_SECTORS.filter((sector) =>
+        circularRangesOverlap(
+          { min: sector.min, max: sector.max },
+          { min: windRange.min, max: windRange.max },
+        ),
+      ).map((sector) => sector.id)
+    : []
+
+  return {
+    periodSelected,
+    windSelected,
+    periodRange,
+    windRange,
+  }
+}
+
 export function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
   if (
+    !d.spotId ||
     !d.waveSelected.length ||
-    !d.periodSelected.length ||
+    (!d.periodSelected.length && !d.spotOptimalPeriodRange) ||
     !d.energySelected.length
   ) {
     return null
   }
 
   const waveRanges = toRanges(d.waveSelected, WAVE_OPTIONS)
-  const periodRanges = toRanges(d.periodSelected, PERIOD_OPTIONS)
+  const periodRanges = d.spotOptimalPeriodRange
+    ? [d.spotOptimalPeriodRange]
+    : toRanges(d.periodSelected, PERIOD_OPTIONS)
   const energyRanges = toRanges(d.energySelected, ENERGY_OPTIONS)
   if (!waveRanges.length || !periodRanges.length || !energyRanges.length)
     return null
@@ -122,10 +215,12 @@ export function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
   const periodEnv = envelope(periodRanges)
   const energyEnv = envelope(energyRanges)
 
-  const windRanges = d.windSelected
-    .map((w) => windSector(w))
-    .filter((w): w is [number, number] => Boolean(w))
-    .map(([min, max]) => ({ min, max }))
+  const windRanges = d.spotOptimalWindRange
+    ? [d.spotOptimalWindRange]
+    : d.windSelected
+        .map((w) => windSector(w))
+        .filter((w): w is [number, number] => Boolean(w))
+        .map(([min, max]) => ({ min, max }))
 
   const windEnv = windRanges.length ? envelopeWind(windRanges) : null
 
@@ -133,6 +228,7 @@ export function draftToAlert(chatId: number, d: DraftAlert): AlertRule | null {
     id: nextId(),
     chatId,
     name: d.name?.trim() || `Alerta ${new Date().toLocaleDateString('es-ES')}`,
+    spotId: d.spotId,
     spot: d.spot,
     waveMin: waveEnv.min,
     waveMax: waveEnv.max,
@@ -286,16 +382,16 @@ export async function getTideEventsForDate(
 
 export async function fetchForecasts(
   apiUrl: string,
-  spot: string,
+  spotId: string,
 ): Promise<SurfForecast[]> {
-  const url = `${apiUrl}/surf-forecast/${encodeURIComponent(spot)}/hourly`
+  const url = `${apiUrl}/surf-forecast/${encodeURIComponent(spotId)}/hourly`
   const res = await fetchWithTimeout(url)
   if (!res || !res.ok) return []
   return (await res.json()) as SurfForecast[]
 }
 
-export async function fetchSpots(apiUrl: string): Promise<string[]> {
-  const url = `${apiUrl}/surf-forecast/spots`
+export async function fetchSpots(apiUrl: string): Promise<SpotOption[]> {
+  const url = `${apiUrl}/spots`
   const res = await fetchWithTimeout(url)
   if (!res || !res.ok) return []
 
@@ -303,15 +399,45 @@ export async function fetchSpots(apiUrl: string): Promise<string[]> {
   if (!Array.isArray(json)) return []
 
   const seen = new Set<string>()
-  const out: string[] = []
+  const out: SpotOption[] = []
   for (const item of json) {
-    if (typeof item !== 'string') continue
-    const spot = item.trim()
-    if (!spot) continue
-    const dedupeKey = spot.toLowerCase()
+    if (!item || typeof item !== 'object') continue
+    const spotIdRaw = (item as { spotId?: unknown }).spotId
+    const spotNameRaw = (item as { spotName?: unknown }).spotName
+    if (typeof spotIdRaw !== 'string' || typeof spotNameRaw !== 'string')
+      continue
+
+    const spotId = spotIdRaw.trim()
+    const spotName = spotNameRaw.trim()
+    if (!spotId || !spotName) continue
+
+    const dedupeKey = spotId
     if (seen.has(dedupeKey)) continue
+
+    const activeRaw =
+      (item as { active?: unknown; isActive?: unknown }).active ??
+      (item as { isActive?: unknown }).isActive
+    if (activeRaw !== true) continue
+
     seen.add(dedupeKey)
-    out.push(spot)
+
+    const optimalConditions = parseSpotOptimalConditions(
+      (item as { optimalConditions?: unknown; optimal_conditions?: unknown })
+        .optimalConditions ??
+        (item as { optimal_conditions?: unknown }).optimal_conditions,
+    )
+
+    out.push({
+      spotId,
+      spotName,
+      spotUrlName:
+        typeof (item as { spotUrlName?: unknown }).spotUrlName === 'string'
+          ? (item as { spotUrlName: string }).spotUrlName.trim() || undefined
+          : undefined,
+      active: true,
+      optimalConditions,
+      location: (item as { location?: unknown }).location,
+    })
   }
 
   return out

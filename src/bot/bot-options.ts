@@ -1,4 +1,4 @@
-import type { AlertRule } from '../core/types.js'
+import type { AlertRule, Range, SpotOption } from '../core/types.js'
 
 export const DEFAULT_SPOT = 'sopelana'
 
@@ -74,8 +74,11 @@ export type TidePreferenceId = (typeof TIDE_PREF_OPTIONS)[number]['id']
 export interface DraftAlert {
   step: Step
   name?: string
+  spotId: string
   spot: string
-  availableSpots?: string[]
+  availableSpots?: SpotOption[]
+  spotOptimalPeriodRange?: Range
+  spotOptimalWindRange?: Range
   waveSelected: string[]
   periodSelected: string[]
   energySelected: string[]
@@ -87,7 +90,7 @@ export interface DraftAlert {
 }
 
 export const COMMANDS_HELP =
-  'Comandos:\n/setalert - crear alerta guiada (con botón ⬅️ Atrás en cada paso)\n/listalerts - ver alertas y borrarlas/pausarlas/reanudarlas con botones\n/cancel - cancelar flujo actual\n/help - ver esta ayuda\n\nMarea en alertas:\n- ANY: sin filtro de marea\n- Alta/Baja: solo horas dentro de ±3h de la marea seleccionada\n- Media: filtro por clase de marea interpolada\n\nNotas:\n- Spot seleccionable desde el backend (/surf-forecast/spots)\n- Se evita spam con deduplicación de ventana (si la ventana no cambia, no reenvía)'
+  'Comandos:\n/setalert - crear alerta guiada (con botón ⬅️ Atrás en cada paso)\n/listalerts - ver alertas y borrarlas/pausarlas/reanudarlas con botones\n/cancel - cancelar flujo actual\n/help - ver esta ayuda\n\nMarea en alertas:\n- ANY: sin filtro de marea\n- Alta/Baja: solo horas dentro de ±3h de la marea seleccionada\n- Media: filtro por clase de marea interpolada\n\nNotas:\n- Spot seleccionable desde el backend (/spots)\n- Se evita spam con deduplicación de ventana (si la ventana no cambia, no reenvía)'
 
 export const BOT_COMMANDS = [
   { command: 'start', description: 'Iniciar bot y ver ayuda' },

@@ -1,5 +1,6 @@
 import { GrammyError, InlineKeyboard } from 'grammy'
 import type { RangeOption, TidePreferenceId } from './bot-options.js'
+import type { SpotOption } from '../core/types.js'
 import {
   TIDE_PORT_OPTIONS,
   TIDE_PREF_OPTIONS,
@@ -49,14 +50,17 @@ export function keyboardFromOptions(
 }
 
 export function spotsKeyboard(
-  spots: string[],
-  selected: string,
+  spots: SpotOption[],
+  selectedSpotId: string,
   allowBack = false,
 ): InlineKeyboard {
   const kb = new InlineKeyboard()
   spots.forEach((spot) => {
-    const prefix = spot === selected ? '✅ ' : ''
-    kb.text(`${prefix}${spot}`, `spot:${encodeURIComponent(spot)}`).row()
+    const prefix = spot.spotId === selectedSpotId ? '✅ ' : ''
+    kb.text(
+      `${prefix}${spot.spotName}`,
+      `spot:${encodeURIComponent(spot.spotId)}`,
+    ).row()
   })
   kb.text('✅ Confirmar', 'spot:DONE')
   if (allowBack) kb.text('⬅️ Atrás', 'spot:BACK')

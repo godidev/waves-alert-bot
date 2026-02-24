@@ -12,6 +12,7 @@ function mkAlert(overrides: Partial<AlertRule> = {}): AlertRule {
     id: 'alert-1',
     chatId: 123,
     name: 'Integración',
+    spotId: 'spot-sopelana-id',
     spot: 'sopelana',
     waveMin: 0,
     waveMax: 10,
@@ -232,8 +233,8 @@ test('runChecksWithDeps cachea forecasts por spot en cada ejecución', async () 
 
   await runChecksWithDeps({
     alerts: [
-      mkAlert({ id: 'alert-1', chatId: 123, spot: 'sopelana' }),
-      mkAlert({ id: 'alert-2', chatId: 456, spot: 'sopelana' }),
+      mkAlert({ id: 'alert-1', chatId: 123, spotId: 'spot-sopelana-id' }),
+      mkAlert({ id: 'alert-2', chatId: 456, spotId: 'spot-sopelana-id' }),
     ],
     minConsecutiveHours: 1,
     fetchForecasts: async () => {

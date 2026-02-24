@@ -7,6 +7,7 @@ export interface AlertRule {
   id: string
   chatId: number
   name: string
+  spotId: string
   spot: string
   waveMin: number
   waveMax: number
@@ -33,7 +34,22 @@ export interface AlertRule {
 export interface SurfForecast {
   date: string
   spot: string
+  spotId?: string
+  spotName?: string
+  location?: unknown
   validSwells: { period: number; angle: number; height: number }[]
   wind: { speed: number; angle: number }
   energy: number
+}
+
+export interface SpotOption {
+  spotId: string
+  spotName: string
+  spotUrlName?: string
+  active?: boolean
+  optimalConditions?: {
+    period?: Range
+    wind?: Range
+  }
+  location?: unknown
 }

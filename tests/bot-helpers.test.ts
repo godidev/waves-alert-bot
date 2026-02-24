@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  deriveOptimalSelections,
   draftToAlert,
   fetchForecasts,
   fetchSpots,
@@ -12,6 +13,7 @@ function mkDraft(overrides: Partial<DraftAlert> = {}): DraftAlert {
   return {
     step: 'confirm',
     name: 'Alerta test',
+    spotId: 'spot-sopelana-id',
     spot: 'sopelana',
     waveSelected: ['1.0-1.5', '2.5-3.0'],
     energySelected: ['low', 'high'],
@@ -67,13 +69,13 @@ test('fetchForecasts usa signal y degrada a [] cuando fetch falla', async () => 
   try {
     const forecasts = await fetchForecasts(
       'https://backend.invalid',
-      'sopelana',
+      'spot-sopelana-id',
     )
     assert.deepEqual(forecasts, [])
     assert.equal(signalSeen, true)
     assert.equal(
       urlSeen,
-      'https://backend.invalid/surf-forecast/sopelana/hourly',
+      'https://backend.invalid/surf-forecast/spot-sopelana-id/hourly',
     )
   } finally {
     globalThis.fetch = originalFetch
@@ -98,7 +100,7 @@ test('getTideEventsForDate usa signal y degrada a [] cuando fetch falla', async 
   }
 })
 
-test('fetchSpots usa endpoint dedicado y devuelve strings únicos', async () => {
+test('fetchSpots usa endpoint dedicado y devuelve spots válidos únicos por spotId', async () => {
   const originalFetch = globalThis.fetch
   let urlSeen = ''
 
@@ -106,14 +108,65 @@ test('fetchSpots usa endpoint dedicado y devuelve strings únicos', async () => 
     urlSeen = String(input)
     return {
       ok: true,
-      json: async () => ['sopelana', 'mundaka', 'Sopelana', '', 123],
+      json: async () => [
+        {
+          spotId: 'spot-sopelana-id',
+          spotName: 'Sopelana',
+          spotUrlName: 'sopelana',
+          active: true,
+          optimalConditions: {
+            period: { min: 10, max: 14 },
+            wind: { min: 200, max: 260 },
+          },
+          location: { lat: 43.3798, lng: -2.9808 },
+        },
+        {
+          spotId: 'spot-mundaka-id',
+          spotName: 'Mundaka',
+          active: true,
+          location: { lat: 43.407, lng: -2.6986 },
+        },
+        {
+          spotId: 'spot-sopelana-id',
+          spotName: 'Sopelana Duplicado',
+          active: true,
+        },
+        {
+          spotId: 'spot-inactive-id',
+          spotName: 'Inactive',
+          active: false,
+        },
+        { spotId: '', spotName: 'Empty id' },
+        { spotId: 'missing-name' },
+        123,
+      ],
     } as Response
   }) as typeof fetch
 
   try {
     const spots = await fetchSpots('https://backend.invalid')
-    assert.equal(urlSeen, 'https://backend.invalid/surf-forecast/spots')
-    assert.deepEqual(spots, ['sopelana', 'mundaka'])
+    assert.equal(urlSeen, 'https://backend.invalid/spots')
+    assert.deepEqual(spots, [
+      {
+        spotId: 'spot-sopelana-id',
+        spotName: 'Sopelana',
+        spotUrlName: 'sopelana',
+        active: true,
+        optimalConditions: {
+          period: { min: 10, max: 14 },
+          wind: { min: 200, max: 260 },
+        },
+        location: { lat: 43.3798, lng: -2.9808 },
+      },
+      {
+        spotId: 'spot-mundaka-id',
+        spotName: 'Mundaka',
+        spotUrlName: undefined,
+        active: true,
+        optimalConditions: undefined,
+        location: { lat: 43.407, lng: -2.6986 },
+      },
+    ])
   } finally {
     globalThis.fetch = originalFetch
   }
@@ -132,4 +185,39 @@ test('fetchSpots degrada a [] cuando fetch falla', async () => {
   } finally {
     globalThis.fetch = originalFetch
   }
+})
+
+test('deriveOptimalSelections mapea optimalConditions a opciones de periodo y viento', () => {
+  const derived = deriveOptimalSelections({
+    spotId: 's1',
+    spotName: 'Sopelana',
+    active: true,
+    optimalConditions: {
+      period: { min: 10, max: 14 },
+      wind: { min: 200, max: 260 },
+    },
+  })
+
+  assert.deepEqual(derived.periodSelected, ['8-10', '10-12', '12-14', '14-16'])
+  assert.deepEqual(derived.windSelected, ['S', 'SW', 'W'])
+  assert.deepEqual(derived.periodRange, { min: 10, max: 14 })
+  assert.deepEqual(derived.windRange, { min: 200, max: 260 })
+})
+
+test('draftToAlert usa rangos optimos de spot para periodo y viento cuando existen', () => {
+  const alert = draftToAlert(
+    123,
+    mkDraft({
+      periodSelected: [],
+      windSelected: [],
+      spotOptimalPeriodRange: { min: 10, max: 14 },
+      spotOptimalWindRange: { min: 200, max: 260 },
+    }),
+  )
+
+  assert.ok(alert)
+  if (!alert) throw new Error('expected alert')
+  assert.equal(alert.periodMin, 10)
+  assert.equal(alert.periodMax, 14)
+  assert.deepEqual(alert.windRanges, [{ min: 200, max: 260 }])
 })

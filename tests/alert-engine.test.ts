@@ -30,6 +30,7 @@ function mkAlert(): AlertRule {
     id: 'a1',
     chatId: 1,
     name: 'Test alerta',
+    spotId: 'spot-sopelana-id',
     spot: 'sopelana',
     waveMin: 0,
     waveMax: 10,

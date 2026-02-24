@@ -17,7 +17,7 @@ export interface AlertWindow {
 interface CheckRunnerDeps {
   alerts: AlertRule[]
   minConsecutiveHours: number
-  fetchForecasts: (spot: string) => Promise<SurfForecast[]>
+  fetchForecasts: (spotId: string) => Promise<SurfForecast[]>
   isWithinAlertWindow: (spot: string, forecastDate: Date) => Promise<boolean>
   getTideEventsForDate: (
     portId: string,
@@ -262,10 +262,10 @@ export async function runChecksWithDeps(
     try {
       if (alert.enabled === false) continue
 
-      let forecasts = forecastsBySpot.get(alert.spot)
+      let forecasts = forecastsBySpot.get(alert.spotId)
       if (!forecasts) {
-        forecasts = await deps.fetchForecasts(alert.spot)
-        forecastsBySpot.set(alert.spot, forecasts)
+        forecasts = await deps.fetchForecasts(alert.spotId)
+        forecastsBySpot.set(alert.spotId, forecasts)
       }
       if (!forecasts.length) continue
 
@@ -341,7 +341,7 @@ export async function runChecksWithDeps(
         atIso: matchedAtIso,
       })
 
-      const dedupeKey = `${alert.chatId}:${alert.spot}:${buildAlertProfileKey(alert)}`
+      const dedupeKey = `${alert.chatId}:${alert.spotId}:${buildAlertProfileKey(alert)}`
       const prevWindow = deps.getLastWindow?.(dedupeKey)
       if (!shouldSendWindow(prevWindow, newWindow)) continue
 
