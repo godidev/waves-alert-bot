@@ -227,10 +227,14 @@ export interface DiscardReasons {
 
 export interface CheckRunStats {
   totalAlerts: number
+  enabledAlerts: number
   matched: number
   notified: number
+  sendAttempts: number
   errors: number
   passAll: number
+  forecastRows: number
+  candidateRows: number
   spots: string[]
   discardReasons: DiscardReasons
 }
@@ -243,10 +247,14 @@ export async function runChecksWithDeps(
   const forecastsBySpot = new Map<string, SurfForecast[]>()
   const stats: CheckRunStats = {
     totalAlerts: deps.alerts.length,
+    enabledAlerts: deps.alerts.filter((a) => a.enabled !== false).length,
     matched: 0,
     notified: 0,
+    sendAttempts: 0,
     errors: 0,
     passAll: 0,
+    forecastRows: 0,
+    candidateRows: 0,
     spots: [...new Set(deps.alerts.map((a) => a.spot))],
     discardReasons: {
       wave: 0,
@@ -266,6 +274,7 @@ export async function runChecksWithDeps(
       if (!forecasts) {
         forecasts = await deps.fetchForecasts(alert.spotId)
         forecastsBySpot.set(alert.spotId, forecasts)
+        stats.forecastRows += forecasts.length
       }
       if (!forecasts.length) continue
 
@@ -293,6 +302,7 @@ export async function runChecksWithDeps(
         }
       }
       if (!matchesFound.length) continue
+      stats.candidateRows += matchesFound.length
 
       stats.matched++
 
@@ -362,6 +372,7 @@ export async function runChecksWithDeps(
           : window.items.map((i) => i.forecast),
       })
 
+      stats.sendAttempts++
       await deps.sendMessage(alert.chatId, message)
       deps.setLastWindow?.(dedupeKey, newWindow)
       const sentAtIso = new Date(now()).toISOString()

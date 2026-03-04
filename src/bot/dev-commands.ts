@@ -61,7 +61,8 @@ export function registerDevCommands(
     const lastLines = [
       '',
       `Último check: ${fmtDateMadrid(last.timestamp)} — ${last.durationMs}ms`,
-      `Matched: ${last.matched} | Enviadas: ${last.notified}`,
+      `Matched: ${last.matched} | Enviadas: ${last.notified}/${last.sendAttempts} intentos`,
+      `Alertas habilitadas: ${last.enabledAlerts} | Forecast rows: ${last.forecastRows} | Candidatas: ${last.candidateRows}`,
       '',
       'Motivos:',
       `  - luz: ${d.light}h ❌`,

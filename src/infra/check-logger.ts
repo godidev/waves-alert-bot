@@ -9,10 +9,14 @@ import type { DiscardReasons } from '../core/check-runner.js'
 export interface CheckLogEntry {
   timestamp: string
   totalAlerts: number
+  enabledAlerts: number
   matched: number
   notified: number
+  sendAttempts: number
   errors: number
   passAll: number
+  forecastRows: number
+  candidateRows: number
   spots: string[]
   durationMs: number
   discardReasons: DiscardReasons
@@ -52,8 +56,13 @@ export async function readLog(): Promise<CheckLogEntry[]> {
     if (!Array.isArray(parsed)) return []
     return parsed.map((e: Record<string, unknown>) => ({
       ...(e as unknown as CheckLogEntry),
+      enabledAlerts:
+        (e.enabledAlerts as number) ?? (e.totalAlerts as number) ?? 0,
+      sendAttempts: (e.sendAttempts as number) ?? (e.notified as number) ?? 0,
       errors: (e.errors as number) ?? 0,
       passAll: (e.passAll as number) ?? 0,
+      forecastRows: (e.forecastRows as number) ?? 0,
+      candidateRows: (e.candidateRows as number) ?? 0,
       discardReasons: (e.discardReasons as DiscardReasons) ?? DEFAULT_DISCARD,
     }))
   } catch {

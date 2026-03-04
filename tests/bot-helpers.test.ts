@@ -187,6 +187,69 @@ test('fetchSpots degrada a [] cuando fetch falla', async () => {
   }
 })
 
+test('fetchForecasts filtra filas inválidas del payload', async () => {
+  const originalFetch = globalThis.fetch
+
+  globalThis.fetch = (async () => {
+    return {
+      ok: true,
+      json: async () => [
+        {
+          date: '2026-02-16T09:00:00.000Z',
+          spot: 'sopelana',
+          energy: 1200,
+          wind: { speed: 12, angle: 45 },
+          validSwells: [{ angle: 300, height: 1.6, period: 11 }],
+        },
+        {
+          date: '2026-02-16T10:00:00.000Z',
+          energy: 1200,
+          wind: { speed: 12, angle: 45 },
+          validSwells: [],
+        },
+      ],
+    } as Response
+  }) as typeof fetch
+
+  try {
+    const forecasts = await fetchForecasts('https://backend.invalid', 'spot-id')
+    assert.equal(forecasts.length, 1)
+    assert.equal(forecasts[0].spot, 'sopelana')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('getTideEventsForDate filtra alturas no numéricas', async () => {
+  const originalFetch = globalThis.fetch
+
+  globalThis.fetch = (async () => {
+    return {
+      ok: true,
+      json: async () => ({
+        mareas: {
+          fecha: '2026-02-16',
+          datos: {
+            marea: [
+              { hora: '07:00', altura: '0.8', tipo: 'bajamar' },
+              { hora: '12:00', altura: 'invalid', tipo: 'pleamar' },
+            ],
+          },
+        },
+      }),
+    } as Response
+  }) as typeof fetch
+
+  try {
+    const tides = await getTideEventsForDate('72', '20260216')
+    assert.deepEqual(tides, [
+      { date: '2026-02-16', hora: '07:00', altura: 0.8, tipo: 'bajamar' },
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('deriveOptimalSelections mapea optimalConditions a opciones de periodo y viento', () => {
   const derived = deriveOptimalSelections({
     spotId: 's1',

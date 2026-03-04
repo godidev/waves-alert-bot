@@ -158,6 +158,61 @@ function parseSpotOptimalConditions(
   return { period: period ?? undefined, wind: wind ?? undefined }
 }
 
+function parseForecastRow(input: unknown): SurfForecast | null {
+  if (!input || typeof input !== 'object') return null
+  const row = input as {
+    date?: unknown
+    spot?: unknown
+    spotId?: unknown
+    spotName?: unknown
+    location?: unknown
+    energy?: unknown
+    wind?: { speed?: unknown; angle?: unknown }
+    validSwells?: unknown
+  }
+
+  const date = typeof row.date === 'string' ? row.date : null
+  const spot = typeof row.spot === 'string' ? row.spot : null
+  const energy = toNumberOrNull(row.energy)
+  const windSpeed = toNumberOrNull(row.wind?.speed)
+  const windAngle = toNumberOrNull(row.wind?.angle)
+  if (
+    !date ||
+    !spot ||
+    energy == null ||
+    windSpeed == null ||
+    windAngle == null
+  ) {
+    return null
+  }
+
+  const rawSwells = Array.isArray(row.validSwells) ? row.validSwells : []
+  const validSwells = rawSwells
+    .map((s) => {
+      if (!s || typeof s !== 'object') return null
+      const swell = s as { period?: unknown; angle?: unknown; height?: unknown }
+      const period = toNumberOrNull(swell.period)
+      const angle = toNumberOrNull(swell.angle)
+      const height = toNumberOrNull(swell.height)
+      if (period == null || angle == null || height == null) return null
+      return { period, angle, height }
+    })
+    .filter((s): s is { period: number; angle: number; height: number } =>
+      Boolean(s),
+    )
+
+  return {
+    date,
+    spot,
+    spotId: typeof row.spotId === 'string' ? row.spotId : undefined,
+    spotName: typeof row.spotName === 'string' ? row.spotName : undefined,
+    location: row.location,
+    energy,
+    wind: { speed: windSpeed, angle: windAngle },
+    validSwells,
+  }
+}
+
 export function deriveOptimalSelections(spot: SpotOption): {
   periodSelected: string[]
   windSelected: string[]
@@ -366,12 +421,18 @@ export async function getTideEventsForDate(
     ? json.mareas.fecha
     : `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`
 
-  const out: TideEvent[] = (json.mareas?.datos?.marea ?? []).map((m) => ({
-    date: datePart,
-    hora: m.hora,
-    altura: Number(m.altura),
-    tipo: m.tipo ?? '',
-  }))
+  const out: TideEvent[] = (json.mareas?.datos?.marea ?? [])
+    .map((m) => {
+      const altura = toNumberOrNull(m.altura)
+      if (altura == null || typeof m.hora !== 'string') return null
+      return {
+        date: datePart,
+        hora: m.hora,
+        altura,
+        tipo: m.tipo ?? '',
+      }
+    })
+    .filter((row): row is TideEvent => Boolean(row))
 
   boundedSet(tideDayCache, cacheKey, out)
   return out
@@ -384,7 +445,11 @@ export async function fetchForecasts(
   const url = `${apiUrl}/surf-forecast/${encodeURIComponent(spotId)}/hourly`
   const res = await fetchWithTimeout(url)
   if (!res || !res.ok) return []
-  return (await res.json()) as SurfForecast[]
+  const json = (await res.json()) as unknown
+  if (!Array.isArray(json)) return []
+  return json
+    .map(parseForecastRow)
+    .filter((row): row is SurfForecast => Boolean(row))
 }
 
 export async function fetchSpots(apiUrl: string): Promise<SpotOption[]> {
