@@ -221,3 +221,16 @@ test('draftToAlert usa rangos optimos de spot para periodo y viento cuando exist
   assert.equal(alert.periodMax, 14)
   assert.deepEqual(alert.windRanges, [{ min: 200, max: 260 }])
 })
+
+test('draftToAlert en viento usa el menor y mayor grado de las selecciones', () => {
+  const alert = draftToAlert(
+    123,
+    mkDraft({
+      windSelected: ['N', 'E'],
+    }),
+  )
+
+  assert.ok(alert)
+  if (!alert) throw new Error('expected alert')
+  assert.deepEqual(alert.windRanges, [{ min: 22.5, max: 337.5 }])
+})

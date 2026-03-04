@@ -97,10 +97,7 @@ function envelope(ranges: Range[]): { min: number; max: number } {
 }
 
 function envelopeWind(ranges: Range[]): { min: number; max: number } {
-  const boundaries = ranges.flatMap((r) => {
-    if (r.min <= r.max) return [r.min, r.max]
-    return [0, r.max, r.min, 360]
-  })
+  const boundaries = ranges.flatMap((r) => [r.min, r.max])
 
   return {
     min: Math.min(...boundaries),

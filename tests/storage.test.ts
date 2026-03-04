@@ -176,3 +176,39 @@ test('storage: normaliza rangos legacy a min/max y elimina duplicados', async ()
     delete process.env.ALERTS_DB_PATH
   }
 })
+
+test('storage: wind ranges legacy use smallest and largest degree boundaries', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'waves-alerts-storage-'))
+  try {
+    const dbPath = join(dir, 'alerts.json')
+    writeFileSync(
+      dbPath,
+      JSON.stringify({
+        alerts: [
+          {
+            id: 'a4',
+            chatId: 1,
+            name: 'legacy-wind-wrap',
+            spot: 'sopelana',
+            waveMin: 1,
+            waveMax: 2,
+            energyMin: 100,
+            energyMax: 200,
+            periodMin: 8,
+            periodMax: 10,
+            windRanges: [{ min: 337.5, max: 22.5 }],
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    )
+    process.env.ALERTS_DB_PATH = dbPath
+
+    const storage = await loadStorageModule()
+    const [alert] = storage.listAllAlerts()
+    assert.deepEqual(alert.windRanges, [{ min: 22.5, max: 337.5 }])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+    delete process.env.ALERTS_DB_PATH
+  }
+})
