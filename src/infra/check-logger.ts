@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 const LOG_PATH = process.env.CHECK_LOG_PATH ?? './data/check-log.json'
@@ -18,14 +18,6 @@ export interface CheckLogEntry {
   discardReasons: DiscardReasons
 }
 
-function ensureLogFile(): void {
-  const dir = dirname(LOG_PATH)
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  if (!existsSync(LOG_PATH)) {
-    writeFileSync(LOG_PATH, JSON.stringify([], null, 2))
-  }
-}
-
 const DEFAULT_DISCARD: DiscardReasons = {
   wave: 0,
   period: 0,
@@ -35,10 +27,27 @@ const DEFAULT_DISCARD: DiscardReasons = {
   light: 0,
 }
 
-export function readLog(): CheckLogEntry[] {
-  ensureLogFile()
+async function pathExists(path: string): Promise<boolean> {
   try {
-    const raw = readFileSync(LOG_PATH, 'utf-8')
+    await readFile(path, 'utf8')
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function ensureLogFile(): Promise<void> {
+  const dir = dirname(LOG_PATH)
+  await mkdir(dir, { recursive: true })
+  if (!(await pathExists(LOG_PATH))) {
+    await writeFile(LOG_PATH, JSON.stringify([], null, 2), 'utf8')
+  }
+}
+
+export async function readLog(): Promise<CheckLogEntry[]> {
+  await ensureLogFile()
+  try {
+    const raw = await readFile(LOG_PATH, 'utf-8')
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
     return parsed.map((e: Record<string, unknown>) => ({
@@ -52,11 +61,11 @@ export function readLog(): CheckLogEntry[] {
   }
 }
 
-export function appendCheckLog(entry: CheckLogEntry): void {
-  const entries = readLog()
+export async function appendCheckLog(entry: CheckLogEntry): Promise<void> {
+  const entries = await readLog()
   entries.push(entry)
 
   const pruned = entries.slice(-MAX_ENTRIES)
-  ensureLogFile()
-  writeFileSync(LOG_PATH, JSON.stringify(pruned, null, 2))
+  await ensureLogFile()
+  await writeFile(LOG_PATH, JSON.stringify(pruned, null, 2), 'utf8')
 }

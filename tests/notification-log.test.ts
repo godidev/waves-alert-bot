@@ -27,10 +27,13 @@ test('notification-log tracks first discovery and increments matches on reruns',
       atIso: '2026-02-19T08:00:00.000Z',
     }
 
-    log.recordNotificationMatch(event)
-    log.recordNotificationMatch({ ...event, atIso: '2026-02-19T09:00:00.000Z' })
+    await log.recordNotificationMatch(event)
+    await log.recordNotificationMatch({
+      ...event,
+      atIso: '2026-02-19T09:00:00.000Z',
+    })
 
-    const entries = log.readNotificationLog()
+    const entries = await log.readNotificationLog()
     assert.equal(entries.length, 1)
     assert.equal(entries[0].matches, 2)
     assert.equal(entries[0].firstDiscoveredAt, '2026-02-19T08:00:00.000Z')
@@ -59,11 +62,17 @@ test('notification-log records sent count and last sent timestamp', async () => 
       atIso: '2026-02-19T08:00:00.000Z',
     }
 
-    log.recordNotificationMatch(event)
-    log.recordNotificationSent({ ...event, atIso: '2026-02-19T08:01:00.000Z' })
-    log.recordNotificationSent({ ...event, atIso: '2026-02-19T08:10:00.000Z' })
+    await log.recordNotificationMatch(event)
+    await log.recordNotificationSent({
+      ...event,
+      atIso: '2026-02-19T08:01:00.000Z',
+    })
+    await log.recordNotificationSent({
+      ...event,
+      atIso: '2026-02-19T08:10:00.000Z',
+    })
 
-    const entries = log.readNotificationLog()
+    const entries = await log.readNotificationLog()
     assert.equal(entries.length, 1)
     assert.equal(entries[0].sentCount, 2)
     assert.equal(entries[0].lastSentAt, '2026-02-19T08:10:00.000Z')
@@ -103,7 +112,7 @@ test('notification-log purges entries whose window end already passed', async ()
     process.env.NOTIFICATIONS_LOG_PATH = logPath
 
     const log = await loadNotificationLogModule()
-    log.recordNotificationMatch({
+    await log.recordNotificationMatch({
       chatId: 2,
       alertId: 'new-alert',
       alertName: 'New',
@@ -113,7 +122,7 @@ test('notification-log purges entries whose window end already passed', async ()
       atIso: '2026-02-19T08:00:00.000Z',
     })
 
-    const entries = log.readNotificationLog()
+    const entries = await log.readNotificationLog()
     assert.equal(entries.length, 1)
     assert.equal(entries[0].alertId, 'new-alert')
   } finally {

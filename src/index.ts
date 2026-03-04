@@ -94,7 +94,7 @@ bot.catch((err) => {
 async function runChecksUnlocked(): Promise<void> {
   const start = Date.now()
   const stats = await runChecksWithDeps({
-    alerts: listAllAlerts(),
+    alerts: await listAllAlerts(),
     minConsecutiveHours: MIN_CONSECUTIVE_HOURS,
     fetchForecasts: (spot) => fetchForecasts(API_URL, spot),
     isWithinAlertWindow,
@@ -113,7 +113,7 @@ async function runChecksUnlocked(): Promise<void> {
     },
   })
 
-  appendCheckLog({
+  await appendCheckLog({
     timestamp: new Date().toISOString(),
     totalAlerts: stats.totalAlerts,
     matched: stats.matched,
@@ -285,7 +285,7 @@ bot.on('callback_query:data', async (ctx) => {
       return
     }
 
-    const deleted = deleteAlert(chatId, value)
+    const deleted = await deleteAlert(chatId, value)
     await ctx.answerCallbackQuery({
       text: deleted ? '🗑️ Alerta borrada' : 'No encontré esa alerta',
     })
@@ -306,14 +306,14 @@ bot.on('callback_query:data', async (ctx) => {
       return
     }
 
-    const target = listAlerts(chatId).find((a) => a.id === value)
+    const target = (await listAlerts(chatId)).find((a) => a.id === value)
     if (!target) {
       await ctx.answerCallbackQuery({ text: 'No encontré esa alerta' })
       return
     }
 
     const nextEnabled = target.enabled === false
-    const updated = setAlertEnabled(chatId, value, nextEnabled)
+    const updated = await setAlertEnabled(chatId, value, nextEnabled)
     await ctx.answerCallbackQuery({
       text: updated
         ? nextEnabled
@@ -323,7 +323,7 @@ bot.on('callback_query:data', async (ctx) => {
     })
 
     if (updated) {
-      const updatedAlerts = listAlerts(chatId)
+      const updatedAlerts = await listAlerts(chatId)
       const alertIdx = updatedAlerts.findIndex((a) => a.id === value)
       const updatedAlert = alertIdx >= 0 ? updatedAlerts[alertIdx] : null
 
@@ -696,7 +696,7 @@ bot.on('callback_query:data', async (ctx) => {
         return
       }
 
-      insertAlert(d.pendingAlert)
+      await insertAlert(d.pendingAlert)
       await ctx.answerCallbackQuery({ text: 'Alerta creada' })
       const doneMsg = await ctx.reply(`✅ Alerta creada: ${d.pendingAlert.id}`)
       await cleanupDraftMessages(chatId, d, doneMsg?.message_id)
@@ -716,7 +716,7 @@ registerDevCommands(bot, {
 })
 
 bot.command('listalerts', async (ctx) => {
-  const alerts = listAlerts(ctx.chat.id)
+  const alerts = await listAlerts(ctx.chat.id)
   if (!alerts.length) {
     await ctx.reply('No tienes alertas.')
     return

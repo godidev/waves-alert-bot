@@ -16,7 +16,7 @@ test('storage: recovers from corrupted JSON by resetting DB and creating backup'
     process.env.ALERTS_DB_PATH = dbPath
 
     const storage = await loadStorageModule()
-    const alerts = storage.listAllAlerts()
+    const alerts = await storage.listAllAlerts()
 
     assert.deepEqual(alerts, [])
 
@@ -62,7 +62,7 @@ test('storage: migrates legacy fields windMin/windMax and spot=sopela', async ()
     process.env.ALERTS_DB_PATH = dbPath
 
     const storage = await loadStorageModule()
-    const [alert] = storage.listAllAlerts()
+    const [alert] = await storage.listAllAlerts()
 
     assert.equal(alert.spot, 'sopelana')
     assert.deepEqual(alert.windRanges, [{ min: 10, max: 20 }])
@@ -104,13 +104,13 @@ test('storage: setAlertEnabled pauses and resumes alerts', async () => {
 
     const storage = await loadStorageModule()
 
-    assert.equal(storage.setAlertEnabled(7, 'a3', false), true)
-    assert.equal(storage.listAlerts(7)[0].enabled, false)
+    assert.equal(await storage.setAlertEnabled(7, 'a3', false), true)
+    assert.equal((await storage.listAlerts(7))[0].enabled, false)
 
-    assert.equal(storage.setAlertEnabled(7, 'a3', true), true)
-    assert.equal(storage.listAlerts(7)[0].enabled, true)
+    assert.equal(await storage.setAlertEnabled(7, 'a3', true), true)
+    assert.equal((await storage.listAlerts(7))[0].enabled, true)
 
-    assert.equal(storage.setAlertEnabled(7, 'missing', false), false)
+    assert.equal(await storage.setAlertEnabled(7, 'missing', false), false)
   } finally {
     rmSync(dir, { recursive: true, force: true })
     delete process.env.ALERTS_DB_PATH
@@ -159,7 +159,7 @@ test('storage: normaliza rangos legacy a min/max y elimina duplicados', async ()
     process.env.ALERTS_DB_PATH = dbPath
 
     const storage = await loadStorageModule()
-    const [alert] = storage.listAllAlerts()
+    const [alert] = await storage.listAllAlerts()
 
     assert.equal(alert.waveMin, 1)
     assert.equal(alert.waveMax, 3)
@@ -205,7 +205,7 @@ test('storage: wind ranges legacy use smallest and largest degree boundaries', a
     process.env.ALERTS_DB_PATH = dbPath
 
     const storage = await loadStorageModule()
-    const [alert] = storage.listAllAlerts()
+    const [alert] = await storage.listAllAlerts()
     assert.deepEqual(alert.windRanges, [{ min: 22.5, max: 337.5 }])
   } finally {
     rmSync(dir, { recursive: true, force: true })

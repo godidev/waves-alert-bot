@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 const LOG_PATH =
@@ -28,13 +28,6 @@ export interface NotificationLogEvent {
   windowStartIso: string
   windowEndIso: string
   atIso: string
-}
-
-function ensureLogFile(): void {
-  const dir = dirname(LOG_PATH)
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  if (!existsSync(LOG_PATH))
-    writeFileSync(LOG_PATH, JSON.stringify([], null, 2))
 }
 
 function parseIsoMs(value: string): number {
@@ -86,10 +79,27 @@ function pruneExpired(
   })
 }
 
-function readEntriesRaw(): NotificationLogEntry[] {
-  ensureLogFile()
+async function pathExists(path: string): Promise<boolean> {
   try {
-    const raw = readFileSync(LOG_PATH, 'utf-8')
+    await readFile(path, 'utf8')
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function ensureLogFile(): Promise<void> {
+  const dir = dirname(LOG_PATH)
+  await mkdir(dir, { recursive: true })
+  if (!(await pathExists(LOG_PATH))) {
+    await writeFile(LOG_PATH, JSON.stringify([], null, 2), 'utf8')
+  }
+}
+
+async function readEntriesRaw(): Promise<NotificationLogEntry[]> {
+  await ensureLogFile()
+  try {
+    const raw = await readFile(LOG_PATH, 'utf-8')
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
     return parsed.filter(isEntryShape)
@@ -98,22 +108,28 @@ function readEntriesRaw(): NotificationLogEntry[] {
   }
 }
 
-function writeEntries(entries: NotificationLogEntry[]): void {
-  ensureLogFile()
-  writeFileSync(LOG_PATH, JSON.stringify(entries.slice(-MAX_ENTRIES), null, 2))
+async function writeEntries(entries: NotificationLogEntry[]): Promise<void> {
+  await ensureLogFile()
+  await writeFile(
+    LOG_PATH,
+    JSON.stringify(entries.slice(-MAX_ENTRIES), null, 2),
+    'utf8',
+  )
 }
 
-export function readNotificationLog(
+export async function readNotificationLog(
   nowMs = Date.now(),
-): NotificationLogEntry[] {
-  const pruned = pruneExpired(readEntriesRaw(), nowMs)
-  writeEntries(pruned)
+): Promise<NotificationLogEntry[]> {
+  const pruned = pruneExpired(await readEntriesRaw(), nowMs)
+  await writeEntries(pruned)
   return pruned
 }
 
-export function recordNotificationMatch(event: NotificationLogEvent): void {
+export async function recordNotificationMatch(
+  event: NotificationLogEvent,
+): Promise<void> {
   const nowMs = nowMsFromIso(event.atIso)
-  const entries = pruneExpired(readEntriesRaw(), nowMs)
+  const entries = pruneExpired(await readEntriesRaw(), nowMs)
   const key = makeKey(event)
   const existing = entries.find((entry) => entry.key === key)
 
@@ -138,12 +154,14 @@ export function recordNotificationMatch(event: NotificationLogEvent): void {
     })
   }
 
-  writeEntries(entries)
+  await writeEntries(entries)
 }
 
-export function recordNotificationSent(event: NotificationLogEvent): void {
+export async function recordNotificationSent(
+  event: NotificationLogEvent,
+): Promise<void> {
   const nowMs = nowMsFromIso(event.atIso)
-  const entries = pruneExpired(readEntriesRaw(), nowMs)
+  const entries = pruneExpired(await readEntriesRaw(), nowMs)
   const key = makeKey(event)
   const existing = entries.find((entry) => entry.key === key)
 
@@ -167,5 +185,5 @@ export function recordNotificationSent(event: NotificationLogEvent): void {
     })
   }
 
-  writeEntries(entries)
+  await writeEntries(entries)
 }

@@ -25,7 +25,7 @@ interface CheckRunnerDeps {
   ) => Promise<TideEvent[]>
   apiDateFromForecastDate: (dateRaw: string) => string
   sendMessage: (chatId: number, message: string) => Promise<void>
-  touchAlertNotified: (id: string, at: string) => void
+  touchAlertNotified: (id: string, at: string) => Promise<void>
   recordNotificationMatch?: (event: {
     chatId: number
     alertId: string
@@ -34,7 +34,7 @@ interface CheckRunnerDeps {
     windowStartIso: string
     windowEndIso: string
     atIso: string
-  }) => void
+  }) => Promise<void>
   recordNotificationSent?: (event: {
     chatId: number
     alertId: string
@@ -43,7 +43,7 @@ interface CheckRunnerDeps {
     windowStartIso: string
     windowEndIso: string
     atIso: string
-  }) => void
+  }) => Promise<void>
   getLastWindow?: (key: string) => AlertWindow | undefined
   setLastWindow?: (key: string, window: AlertWindow) => void
   nowMs?: () => number
@@ -331,7 +331,7 @@ export async function runChecksWithDeps(
       const windowEndIso = new Date(newWindow.endMs).toISOString()
       const matchedAtIso = new Date(now()).toISOString()
 
-      deps.recordNotificationMatch?.({
+      await deps.recordNotificationMatch?.({
         chatId: alert.chatId,
         alertId: alert.id,
         alertName: alert.name,
@@ -365,8 +365,8 @@ export async function runChecksWithDeps(
       await deps.sendMessage(alert.chatId, message)
       deps.setLastWindow?.(dedupeKey, newWindow)
       const sentAtIso = new Date(now()).toISOString()
-      deps.touchAlertNotified(alert.id, sentAtIso)
-      deps.recordNotificationSent?.({
+      await deps.touchAlertNotified(alert.id, sentAtIso)
+      await deps.recordNotificationSent?.({
         chatId: alert.chatId,
         alertId: alert.id,
         alertName: alert.name,

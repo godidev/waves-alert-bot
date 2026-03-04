@@ -107,7 +107,9 @@ test('runChecksWithDeps envía mensaje cuando hay ventana consecutiva válida', 
     sendMessage: async (_chatId, message) => {
       sent.push(message)
     },
-    touchAlertNotified: (id) => touched.push(id),
+    touchAlertNotified: async (id) => {
+      touched.push(id)
+    },
     nowMs: () => new Date('2026-02-16T08:00:00.000Z').getTime(),
   })
 
@@ -135,7 +137,7 @@ test('runChecksWithDeps no envía si no se cumple consecutividad mínima', async
     sendMessage: async () => {
       sent++
     },
-    touchAlertNotified: () => undefined,
+    touchAlertNotified: async () => undefined,
   })
 
   assert.equal(sent, 0)
@@ -154,7 +156,7 @@ test('runChecksWithDeps marea alta: filtra fuera de ventana ±3h de pleamar', as
     sendMessage: async () => {
       sent++
     },
-    touchAlertNotified: () => undefined,
+    touchAlertNotified: async () => undefined,
   })
 
   // Pleamar 12:30 -> ventana válida 09:30..15:30, por tanto 18:00 no entra.
@@ -177,7 +179,7 @@ test('runChecksWithDeps marea alta interpreta horas de marea en UTC', async () =
     sendMessage: async () => {
       sent++
     },
-    touchAlertNotified: () => undefined,
+    touchAlertNotified: async () => undefined,
   })
 
   // 12:00 (API UTC) -> ventana 09:00..15:00Z.
@@ -198,7 +200,7 @@ test('runChecksWithDeps marea alta usa ventana ±3h sin exigir clase alta', asyn
     sendMessage: async () => {
       sent++
     },
-    touchAlertNotified: () => undefined,
+    touchAlertNotified: async () => undefined,
   })
 
   // Pleamar 12:30 -> ventana 09:30..15:30, por tanto 15:00 entra.
@@ -219,7 +221,7 @@ test('runChecksWithDeps marea baja: filtra fuera de ventana ±3h de bajamar', as
     sendMessage: async () => {
       sent++
     },
-    touchAlertNotified: () => undefined,
+    touchAlertNotified: async () => undefined,
   })
 
   // Bajamar más próxima 07:00 -> ventana 04:00..10:00.
@@ -247,7 +249,7 @@ test('runChecksWithDeps cachea forecasts por spot en cada ejecución', async () 
     sendMessage: async () => {
       sent++
     },
-    touchAlertNotified: () => undefined,
+    touchAlertNotified: async () => undefined,
   })
 
   assert.equal(fetchCalls, 1)
@@ -271,7 +273,7 @@ test('runChecksWithDeps ignora alertas pausadas', async () => {
     sendMessage: async () => {
       sent++
     },
-    touchAlertNotified: () => undefined,
+    touchAlertNotified: async () => undefined,
   })
 
   assert.equal(fetchCalls, 0)
@@ -294,7 +296,7 @@ test('runChecksWithDeps registra match en cada rerun aunque dedupe evite envío'
     sendMessage: async () => {
       sent++
     },
-    touchAlertNotified: () => undefined,
+    touchAlertNotified: async () => undefined,
     getLastWindow: (key: string) => sentWindows.get(key),
     setLastWindow: (
       key: string,
@@ -302,10 +304,10 @@ test('runChecksWithDeps registra match en cada rerun aunque dedupe evite envío'
     ) => {
       sentWindows.set(key, window)
     },
-    recordNotificationMatch: () => {
+    recordNotificationMatch: async () => {
       matchRecords++
     },
-    recordNotificationSent: () => {
+    recordNotificationSent: async () => {
       sentRecords++
     },
   }
@@ -339,7 +341,7 @@ test('runChecksWithDeps incluye 4h de contexto y marca horas buenas en tabla', a
     sendMessage: async (_chatId, message) => {
       sent.push(message)
     },
-    touchAlertNotified: () => undefined,
+    touchAlertNotified: async () => undefined,
   })
 
   assert.equal(sent.length, 1)

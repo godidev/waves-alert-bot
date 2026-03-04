@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { AlertRule } from '../core/types.js'
 
@@ -35,13 +35,23 @@ function envelopeWind(ranges: { min: number; max: number }[]): {
   }
 }
 
-function ensureDb(): void {
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await readFile(path, 'utf8')
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function ensureDb(): Promise<void> {
   const dir = dirname(DB_PATH)
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  if (!existsSync(DB_PATH)) {
-    writeFileSync(
+  await mkdir(dir, { recursive: true })
+  if (!(await pathExists(DB_PATH))) {
+    await writeFile(
       DB_PATH,
       JSON.stringify({ alerts: [] } satisfies DbShape, null, 2),
+      'utf8',
     )
   }
 }
@@ -97,23 +107,23 @@ function migrateAlert(rawAlert: unknown): AlertRule {
   return alert as AlertRule
 }
 
-function resetCorruptedDb(raw: string): DbShape {
+async function resetCorruptedDb(raw: string): Promise<DbShape> {
   const backupPath = `${DB_PATH}.corrupted-${Date.now()}.bak`
   try {
-    writeFileSync(backupPath, raw)
+    await writeFile(backupPath, raw, 'utf8')
   } catch {
     // noop
   }
 
   const empty: DbShape = { alerts: [] }
-  writeFileSync(DB_PATH, JSON.stringify(empty, null, 2))
+  await writeFile(DB_PATH, JSON.stringify(empty, null, 2), 'utf8')
   return empty
 }
 
-function readDb(): DbShape {
-  ensureDb()
+async function readDb(): Promise<DbShape> {
+  await ensureDb()
 
-  const raw = readFileSync(DB_PATH, 'utf8')
+  const raw = await readFile(DB_PATH, 'utf8')
   let parsed: DbShape
 
   try {
@@ -128,57 +138,63 @@ function readDb(): DbShape {
 
   if (changed) {
     const next = { alerts: migratedAlerts }
-    writeFileSync(DB_PATH, JSON.stringify(next, null, 2))
+    await writeFile(DB_PATH, JSON.stringify(next, null, 2), 'utf8')
     return next
   }
 
   return { alerts: migratedAlerts }
 }
 
-function writeDb(next: DbShape): void {
-  ensureDb()
-  writeFileSync(DB_PATH, JSON.stringify(next, null, 2))
+async function writeDb(next: DbShape): Promise<void> {
+  await ensureDb()
+  await writeFile(DB_PATH, JSON.stringify(next, null, 2), 'utf8')
 }
 
-export function listAlerts(chatId: number): AlertRule[] {
-  return readDb().alerts.filter((a) => a.chatId === chatId)
+export async function listAlerts(chatId: number): Promise<AlertRule[]> {
+  return (await readDb()).alerts.filter((a) => a.chatId === chatId)
 }
 
-export function insertAlert(alert: AlertRule): void {
-  const db = readDb()
+export async function insertAlert(alert: AlertRule): Promise<void> {
+  const db = await readDb()
   db.alerts.push(alert)
-  writeDb(db)
+  await writeDb(db)
 }
 
-export function deleteAlert(chatId: number, id: string): boolean {
-  const db = readDb()
+export async function deleteAlert(
+  chatId: number,
+  id: string,
+): Promise<boolean> {
+  const db = await readDb()
   const lenBefore = db.alerts.length
   db.alerts = db.alerts.filter((a) => !(a.chatId === chatId && a.id === id))
-  writeDb(db)
+  await writeDb(db)
   return db.alerts.length < lenBefore
 }
 
-export function setAlertEnabled(
+export async function setAlertEnabled(
   chatId: number,
   id: string,
   enabled: boolean,
-): boolean {
-  const db = readDb()
+): Promise<boolean> {
+  const db = await readDb()
   const target = db.alerts.find((a) => a.chatId === chatId && a.id === id)
   if (!target) return false
   target.enabled = enabled
-  writeDb(db)
+  await writeDb(db)
   return true
 }
 
-export function listAllAlerts(): AlertRule[] {
-  return readDb().alerts
+export async function listAllAlerts(): Promise<AlertRule[]> {
+  return (await readDb()).alerts
 }
 
-export function touchAlertNotified(id: string, atIso: string): void {
-  const db = readDb()
+export async function touchAlertNotified(
+  id: string,
+  atIso: string,
+): Promise<void> {
+  const db = await readDb()
   const target = db.alerts.find((a) => a.id === id)
   if (!target) return
   target.lastNotifiedAt = atIso
-  writeDb(db)
+  await writeDb(db)
 }

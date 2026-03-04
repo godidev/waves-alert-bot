@@ -28,9 +28,9 @@ export function registerDevCommands(
   bot.command('status', async (ctx) => {
     if (!deps.isDevChat(ctx.chat.id)) return
 
-    const allAlerts = listAllAlerts()
+    const allAlerts = await listAllAlerts()
     const spots = [...new Set(allAlerts.map((a) => a.spot))]
-    const log = readLog()
+    const log = await readLog()
     const last = log.at(-1)
     const uptimeMs = Date.now() - deps.startedAt
     const uptimeH = Math.floor(uptimeMs / 3_600_000)
@@ -79,7 +79,7 @@ export function registerDevCommands(
   bot.command('checklog', async (ctx) => {
     if (!deps.isDevChat(ctx.chat.id)) return
 
-    const log = readLog()
+    const log = await readLog()
     if (!log.length) {
       await ctx.reply('Check log vacío.')
       return
@@ -101,7 +101,7 @@ export function registerDevCommands(
     await ctx.reply('Ejecutando check run...')
     try {
       await deps.runChecks()
-      const last = readLog().at(-1)
+      const last = (await readLog()).at(-1)
       await ctx.reply(
         last
           ? `Check completado en ${last.durationMs}ms\nmatched=${last.matched} notified=${last.notified}`
@@ -215,7 +215,7 @@ export function registerDevCommands(
   bot.command('alerts_all', async (ctx) => {
     if (!deps.isDevChat(ctx.chat.id)) return
 
-    const allAlerts = listAllAlerts()
+    const allAlerts = await listAllAlerts()
     if (!allAlerts.length) {
       await ctx.reply('No hay alertas registradas.')
       return
