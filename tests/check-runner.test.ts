@@ -23,7 +23,6 @@ function mkAlert(overrides: Partial<AlertRule> = {}): AlertRule {
     waveRanges: [{ min: 1.2, max: 2.2 }],
     periodRanges: [{ min: 10, max: 13 }],
     windRanges: [{ min: 22.5, max: 67.5 }],
-    cooldownMin: 180,
     tidePortId: '72',
     tidePortName: 'Bermeo',
     tidePreference: 'any',
