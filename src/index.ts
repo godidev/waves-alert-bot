@@ -15,6 +15,7 @@ import {
   recordNotificationSent,
 } from './infra/notification-log.js'
 import { startHourlySchedulerAtMinute } from './core/scheduler.js'
+import { createSingleFlightRunner } from './core/single-flight.js'
 import { buildCleanupDeleteList } from './bot/flow-cleanup.js'
 import {
   BOT_COMMANDS,
@@ -90,7 +91,7 @@ bot.catch((err) => {
   notifyDev(`[bot.catch] ${String(err.error)}`)
 })
 
-async function runChecks(): Promise<void> {
+async function runChecksUnlocked(): Promise<void> {
   const start = Date.now()
   const stats = await runChecksWithDeps({
     alerts: listAllAlerts(),
@@ -124,6 +125,8 @@ async function runChecks(): Promise<void> {
     discardReasons: stats.discardReasons,
   })
 }
+
+const runChecks = createSingleFlightRunner(runChecksUnlocked)
 
 function normalizeSpots(spots: SpotOption[]): SpotOption[] {
   const seen = new Set<string>()
@@ -706,7 +709,9 @@ bot.on('callback_query:data', async (ctx) => {
 registerDevCommands(bot, {
   isDevChat,
   startedAt,
-  runChecks,
+  runChecks: async () => {
+    await runChecks()
+  },
   lastSentWindows,
 })
 
@@ -737,15 +742,19 @@ if (DEV_CHAT_ID) {
 bot.start()
 startHourlySchedulerAtMinute(
   () =>
-    runChecks().catch((err) => {
-      console.error('scheduler_check_error', err)
-      notifyDev(`[scheduler] Check run error: ${String(err)}`)
-    }),
+    runChecks()
+      .then(() => undefined)
+      .catch((err) => {
+        console.error('scheduler_check_error', err)
+        notifyDev(`[scheduler] Check run error: ${String(err)}`)
+      }),
   10,
 )
-void runChecks().catch((err) => {
-  console.error('initial_check_error', err)
-  notifyDev(`[startup] Check run error: ${String(err)}`)
-})
+void runChecks()
+  .then(() => undefined)
+  .catch((err) => {
+    console.error('initial_check_error', err)
+    notifyDev(`[startup] Check run error: ${String(err)}`)
+  })
 
 console.log('waves-alerts-bot running. scheduler=:10 Europe/Madrid')
